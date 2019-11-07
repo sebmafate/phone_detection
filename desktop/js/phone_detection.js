@@ -22,7 +22,7 @@ function addCmdToTable(_cmd) {
               <td>\
                 <a class="btn btn-default btn-xs cmdAction expertModeVisible" data-action="configure"><i class="fa fa-cogs"></i></a> \
                 <a class="btn btn-default btn-xs cmdAction" data-action="test"><i class="fa fa-rss"></i> {{Tester}}</a> \
-                <i class="fa fa-minus-circle pull-right cmdAction cursor" data-action="remove"></i> \
+                <!--<i class="fa fa-minus-circle pull-right cmdAction cursor" data-action="remove"></i>--> \
               </td> \
             </tr>';
     // Ajoute la ligne au tableau

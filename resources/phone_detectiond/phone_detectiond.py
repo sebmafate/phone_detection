@@ -47,7 +47,7 @@ class Phone:
         if not self.isReachable:
             self.isReachable = True
             self.lastStateDate = datetime.now()
-            logging.debug('Set {}\'s phone present'.format(self.humanName))
+            logging.info('Set {}\'s phone present'.format(self.humanName))
             return True
         return False
 
@@ -59,7 +59,7 @@ class Phone:
         if self.isReachable and datetime.now() > thresholdDate:
             self.isReachable = False
             self.lastStateDate = datetime.now()
-            logging.debug('Set {}\'s phone absent'.format(self.humanName))
+            logging.info('Set {}\'s phone absent'.format(self.humanName))
             return True
         return False
 
@@ -96,15 +96,15 @@ class PhoneEncoder(json.JSONEncoder):
 
 class JeedomCallback:
     def __init__(self, apikey, url, sleeptime):
-        logging.debug('Create {} daemon'.format(PLUGIN_NAME))
+        logging.info('Create {} daemon'.format(PLUGIN_NAME))
         self.apikey = apikey
         self.url = url
         self.sleeptime = sleeptime
         self.messages = []
         self._stop = False
-        self.t = threading.Thread(target=self.run)
+        self.Thread = threading.Thread(target=self.run)
         self.daemon = True
-        self.t.start()
+        self.Thread.start()
 
     def stop(self):
         self._stop = True
@@ -126,6 +126,7 @@ class JeedomCallback:
 
                         logging.debug('Send device status to Jeedom ? {}'.format(mustUpdate))
                         if mustUpdate:
+                            logging.info('{} status has changed to \'{}\'! Notify Jeedom.'.format(devices[key].humanName, ('present', 'absent')[devices[key].isReachable]))
                             self.send_now({'id' : int(key), 'value': (0,1)[devices[key].isReachable]})
 
                     except Exception as error:
@@ -162,7 +163,6 @@ class JeedomCallback:
 
 class JeedomHandler(socketserver.BaseRequestHandler):
     def handle(self):
-        print('Message received in socket')
         # self.request is the TCP socket connected to the client
         self.data = self.request.recv(1024)
         logging.debug("Message received in socket")
@@ -177,8 +177,6 @@ class JeedomHandler(socketserver.BaseRequestHandler):
 
         action = message.get('action')
         args = message.get('args')
-
-        logging.debug('action: {}'.format(action))
 
         if action == 'update_device' or action == 'insert_device':
             id = args[0]
@@ -263,22 +261,25 @@ def handler(signum=None, frame=None):
 
 
 def shutdown():
-    logging.debug("Shutdown")
+    logging.info("Shutdown")
     # logging.debug('Saving {} state'.format(PLUGIN_NAME))
     # z.save_state()
     # logging.debug('Closing {}'.format(PLUGIN_NAME))
     # z.close()
-    logging.debug("Shutting down callback server")
+    logging.info("Shutting down callback server")
     jc.stop()
-    logging.debug("Shutting down local server")
+    logging.info("Shutting down local server")
     server.shutdown()
-    logging.debug("Removing Socket file " + str(_sockfile))
+    # if handlerThread.isAlive():
+    #     handlerThread._stop()
+
+    logging.info("Removing Socket file " + str(_sockfile))
     if os.path.exists(_sockfile):
         os.remove(_sockfile)
-    logging.debug("Removing PID file " + str(_pidfile))
+    logging.info("Removing PID file " + str(_pidfile))
     if os.path.exists(_pidfile):
         os.remove(_pidfile)
-    logging.debug("Exit 0")
+    logging.info("Exit 0")
 
 
 def saveDevices(devices):
@@ -357,6 +358,6 @@ if os.path.exists(args.socket):
     os.unlink(args.socket)
 server = socketserver.UnixStreamServer(args.socket, JeedomHandler)
 
-t = threading.Thread(target=server.serve_forever)
-t.start()
+handlerThread = threading.Thread(target=server.serve_forever)
+handlerThread.start()
 

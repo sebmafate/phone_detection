@@ -168,9 +168,9 @@ $eqLogics = eqLogic::byType($plugin->getId());
         <!-- Panneau des commandes de l'objet -->
         <div role="tabpanel" class="tab-pane" id="commandtab">
           <!-- Bouton d'ajout d'une commande -->
-          <a class="btn btn-success btn-sm cmdAction pull-right" data-action="add" style="margin-top:5px;"> <i
+          <!-- <a class="btn btn-success btn-sm cmdAction pull-right" data-action="add" style="margin-top:5px;"> <i
                 class="fa fa-plus-circle"></i> {{Commandes}}</a>
-          <br/><br/>
+          <br/><br/> -->
           <!-- Tableau des commandes -->
           <table id="table_cmd" class="table table-bordered table-condensed">
             <thead>

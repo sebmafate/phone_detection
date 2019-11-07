@@ -61,21 +61,17 @@ class phone_detection extends eqLogic
             ];
             try {
                 fwrite($fp, json_encode($query));
-                log::add('phone_detection', 'debug', json_encode($query));
                 while (!feof($fp)) {
                     $result .= fgets($fp, 1024);
                 }
-                log::add('phone_detection', 'debug', 'test');
             } catch( Exception $ex) {
-                log::add('phone_detection', 'debug', print_r($ex));
+                log::add('phone_detection', 'info', print_r($ex));
             } finally {
-                log::add('phone_detection', 'debug', 'finally');
                 fclose($fp);
             }
         }
-        log::add('phone_detection', 'debug', 'get result');
         $result = (is_json($result)) ? json_decode($result, true) : $result;
-        log::add('zigate', 'debug', 'result callDeamon '.print_r($result, true));
+        log::add('phone_detection', 'debug', 'result callDeamon '.print_r($result, true));
 
         return $result;
     }
@@ -102,7 +98,7 @@ class phone_detection extends eqLogic
         } catch (\Exception $e) {
             log::add('phone_detection', 'warning', 'Impossible de récupérer la version.');
         }
-        log::add('phone_detection','warning','version:' . $pluginVersion);
+        // log::add('phone_detection','info','version:' . $pluginVersion);
         return $pluginVersion;
     }
 
