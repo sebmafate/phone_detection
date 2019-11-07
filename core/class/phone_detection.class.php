@@ -11,70 +11,75 @@ class phone_detection extends eqLogic
     /************* Static methods ************/
 
     // /**
-    //  * Tâche exécutée toutes les 30 minutes.
+    //  * Tâche exécutée toutes les minutes.
     //  *
     //  * @param null $_eqLogic_id Identifiant des objets
     //  */
-    // public static function cron30($_eqLogic_id = null)
+
+
+    // public static function cron($_eqLogic_id = null)
     // {
-    //     // Récupère la liste des équipements
-    //     if ($_eqLogic_id == null) {
-    //         $eqLogics = self::byType('phone_detection', true);
-    //     } else {
-    //         $eqLogics = array(self::byId($_eqLogic_id));
-    //     }
-    //     // Met à jour l'ensemble des équipements
-    //     foreach ($eqLogics as $phone_detectionObj) {
-    //         // On récupère la commande 'data' appartenant à l'équipement
-    //         $dataCmd = $phone_detectionObj->getCmd('info', 'data');
-    //         // On lui ajoute un évènement avec pour information 'Données de test'
-    //         $dataCmd->event(date('H:i'));
-    //         // On sauvegarde cet évènement
-    //         $dataCmd->save();
-    //     }
+    //   // Récupère la liste des téléphones
+    //   if ($_eqLogic_id == null) {
+    //     $eqLogics = self::byType('phone_detection', true);
+    //   } else {
+    //     $eqLogics = array(self::byId($_eqLogic_id));
+    //   }
+
+    //   // Met à jour l'ensemble des équipements
+    //   foreach($eqLogics as $phone_detectionObj) {
+ 	//       $getDataCmd = $phone_detectionObj->getCmd(/*'action'*/ null, 'refresh');
+	//       if(is_object($getDataCmd)) {
+	// 	      log::add('phone_detection', 'debug', $getDataCmd->getId() );
+	// 	      $getDataCmd->execute();
+	//       }
+    //   }
     // }
 
-    //     /**
-    //  * Get property by name.
-    //  *
-    //  * @param  string $name The propertiy's name.
-    //  * @return array  The cmd return.
-    //  */
-    // public static function getProperty($device, $name)
-    // {
-    //     $cmds = $device->searchCmdByConfiguration('configuration');
-    //     foreach ($cmds as $cmd) {
-    //         if ($cmd->getConfiguration('configuration') == $name) {
-    //             return $cmd->execCmd();
-    //         }
-    //     }
-    // }
-
-    /**
-     * Tâche exécutée toutes les minutes.
+        /**
+     * Call the call Python daemon.
      *
-     * @param null $_eqLogic_id Identifiant des objets
+     * @param  string $action Action calling.
+     * @param  string $args   Other arguments.
+     * @return array  Result of the callZiGate.
      */
-
-
-    public static function cron($_eqLogic_id = null)
+    public static function callDeamon($action, $args = '')
     {
-      // Récupère la liste des téléphones
-      if ($_eqLogic_id == null) {
-        $eqLogics = self::byType('phone_detection', true);
-      } else {
-        $eqLogics = array(self::byId($_eqLogic_id));
-      }
+        log::add('phone_detection', 'debug', 'callDeamon ' . print_r($action, true) . ' ' .print_r($args, true));
+        $apikey = jeedom::getApiKey('phone_detection');
+        $sock = 'unix://' . jeedom::getTmpFolder('phone_detection') . '/daemon.sock';
+        $fp = stream_socket_client($sock, $errno, $errstr);
+        $result = '';
 
-      // Met à jour l'ensemble des équipements
-      foreach($eqLogics as $phone_detectionObj) {
- 	      $getDataCmd = $phone_detectionObj->getCmd(/*'action'*/ null, 'refresh');
-	      if(is_object($getDataCmd)) {
-		      log::add('phone_detection', 'debug', $getDataCmd->getId() );
-		      $getDataCmd->execute();
-	      }
-      }
+        log::add('phone_detection', 'debug', 'error ' . $errno .' : '. $errstr);
+
+        if ($fp) {
+            $query = [
+                'action' => $action,
+                'args' => $args,
+                'apikey' => $apikey
+            ];
+            try {
+                fwrite($fp, json_encode($query));
+                log::add('phone_detection', 'debug', json_encode($query));
+                while (!feof($fp)) {
+                    $result .= fgets($fp, 1024);
+                }
+                log::add('phone_detection', 'debug', 'test');
+            } catch( Exception $ex) {
+                log::add('phone_detection', 'debug', print_r($ex));
+            } finally {
+                log::add('phone_detection', 'debug', 'finally');
+                fclose($fp);
+            }
+        }
+        log::add('phone_detection', 'debug', 'get result');
+        $result = (is_json($result)) ? json_decode($result, true) : $result;
+        log::add('zigate', 'debug', 'result callDeamon '.print_r($result, true));
+
+        return $result;
     }
+
 
     /**************** Methods ****************/
     /**
@@ -110,7 +115,7 @@ class phone_detection extends eqLogic
     {
         $return = [
             'state' => 'nok',
-            'log' => 'zigate_update',
+            'log' => 'phone_detection_update',
             'progress_file' => jeedom::getTmpFolder('phone_detection') . '/dependance'
         ];
 
@@ -194,7 +199,7 @@ class phone_detection extends eqLogic
         $deamon_path = dirname(__FILE__) . '/../../resources';
         $interval = config::byKey('interval', 'phone_detection');
         $absentThreshold = config::byKey('absentThreshold', 'phone_detection');
-        $callback = network::getNetworkAccess('internal', 'proto:127.0.0.1:port:comp'); // . '/plugins/zigate/core/php/jeeZiGate.php';
+        $callback = network::getNetworkAccess('internal', 'proto:127.0.0.1:port:comp') . '/plugins/phone_detection/core/php/phone_detection.php';
 
         $cmd = '/usr/bin/python3 ' . $deamon_path . '/phone_detectiond/phone_detectiond.py ';
         // if ($host) {
@@ -256,7 +261,7 @@ class phone_detection extends eqLogic
             $i++;
         }
         if ($i >= 5) {
-            log::add('phone_detection', 'error', 'Impossible d\'arrêter le démon ziphone_detectiongate, tuons-le');
+            log::add('phone_detection', 'error', 'Impossible d\'arrêter le démon phone_detection, tuons-le');
             system::kill('phone_detectiond.py');
         }
     }
@@ -277,8 +282,30 @@ class phone_detection extends eqLogic
         ];
     }
 
+    public function postInsert() {
+        phone_detection::callDeamon('insert_device',
+            [
+                $this->getId(),
+                $this->getName(),
+                $this->getConfiguration('macAddress')
+            ]
+        );
+    }
+
+    public function preRemove() {
+        phone_detection::callDeamon('remove_device', 
+            [
+                $this->getId(),
+                $this->getName(),
+                $this->getConfiguration('macAddress')
+            ]
+        );
+    }
+
     public function postUpdate()
     {
+        log::add('phone_detection', 'debug', 'postUpdate()');
+
         $getDataCmd = $this->getCmd(null, 'state');
         if (!is_object($getDataCmd)) {
             // Création de la commande
@@ -317,6 +344,25 @@ class phone_detection extends eqLogic
             // Sauvegarde de la commande
             $cmd->save();
         }
+
+        if ($this->getIsEnable()) {
+            phone_detection::callDeamon('update_device', 
+                [
+                    $this->getId(),
+                    $this->getName(),
+                    $this->getConfiguration('macAddress')
+                ]
+            );
+        } else {
+            phone_detection::callDeamon('remove_device', 
+            [
+                $this->getId(),
+                $this->getName(),
+                $this->getConfiguration('macAddress')
+            ]
+        );
+        }
+
     }
 
     public static function postSave() {

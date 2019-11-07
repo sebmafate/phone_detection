@@ -19,7 +19,7 @@ import uuid
 import subprocess
 import collections
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 BASE_PATH = os.path.join(os.path.dirname(__file__), '..', '..', '..', '..')
 BASE_PATH = os.path.abspath(BASE_PATH)
@@ -27,7 +27,7 @@ PLUGIN_NAME = "phone_detection"
 SAVE_LOCK = threading.Lock()
 
 # DEVICES_FILENAME = os.path.join(BASE_PATH, "devices.json")
-DEVICES_FILENAMENAME = "devices.json"
+DEVICES_FILENAME = os.path.join(BASE_PATH, "plugins", "phone_detection", "devices.json")
 
 # store last 15 responses for terminal
 LAST_RESPONSES = collections.deque([], 15)
@@ -39,6 +39,7 @@ class Phone:
     def __init__(self, macAddress, deviceId):
         self.macAddress = macAddress
         self.deviceId = deviceId
+        self.humanName = ''
         self.isReachable = False
         self.lastStateDate = datetime.now()
 
@@ -46,26 +47,38 @@ class Phone:
         if not self.isReachable:
             self.isReachable = True
             self.lastStateDate = datetime.now()
+            logging.debug('Set {}\'s phone present'.format(self.humanName))
+            return True
+        return False
 
     def setNotReachable(self):
-        if self.isReachable:
+        thresholdDate = self.lastStateDate + timedelta(seconds=int(args.absentThreshold))
+        logging.debug('lastStateDate: {}'.format(self.lastStateDate))
+        logging.debug('thresholdDate: {}'.format(thresholdDate))
+        logging.debug('is datetime.now() > thresholdDate ? {}'.format(datetime.now() > thresholdDate))
+        if self.isReachable and datetime.now() > thresholdDate:
             self.isReachable = False
             self.lastStateDate = datetime.now()
+            logging.debug('Set {}\'s phone absent'.format(self.humanName))
+            return True
+        return False
 
     def toJson(self):
         r = {
             'macAddress': self.macAddress,
             'deviceId': self.deviceId,
             'isReachable': self.isReachable,
-            'lastStateDate': self.lastStateDate.isoformat()
+            'lastStateDate': self.lastStateDate.isoformat(),
+            'humanName' : self.humanName
         }
         return r
 
     @staticmethod
-    def fromJson(macAddress, deviceId, isReachable=False, lastStateDate=datetime.now()):
+    def fromJson(macAddress, deviceId, humanName, isReachable=False, lastStateDate=datetime.now()):
         obj = Phone(macAddress, deviceId)
         obj.isReachable = isReachable
         obj.lastStateDate = lastStateDate
+        obj.humanName = humanName
         return obj
 
 
@@ -73,6 +86,11 @@ class PhoneEncoder(json.JSONEncoder):
     def default(self, obj):  # pylint: disable=E0202
         if isinstance(obj, Phone):
             return obj.toJson()
+        if obj is None:
+            return ""
+        # if isinstance(obj, Response):
+        #     return obj.cleaned_data()
+
         return json.JSONEncoder.default(self, obj)
 
 
@@ -96,29 +114,32 @@ class JeedomCallback:
             devices = loadDevices()
             if devices is not None:
                 for key in devices:
-                    logging.debug('Ping {} [{}] phone'.format(key, devices[key].macAddress))
+                    logging.debug('Ping {} [{}] phone'.format(devices[key].humanName, devices[key].macAddress))
                     try:
                         result = subprocess.run(['sudo', 'hcitool', 'name', devices[key].macAddress], stdout=subprocess.PIPE)
-                        logging.debug('Result: {}'.format(result.stdout))
+                        # logging.debug('Result: {}'.format(result.stdout))
+                        mustUpdate = False
                         if result.stdout:
-                            devices[key].setReachable()
+                            mustUpdate = devices[key].setReachable()
                         else:
-                            devices[key].setNotReachable()
+                            mustUpdate = devices[key].setNotReachable()
+
+                        logging.debug('Send device status to Jeedom ? {}'.format(mustUpdate))
+                        if mustUpdate:
+                            self.send_now({'id' : int(key), 'value': (0,1)[devices[key].isReachable]})
 
                     except Exception as error:
-                        logging.error('Error on ping {} [{}] device: {}'.format(key, devices[key].macAddress, error))
+                        logging.error('Error on ping {} [{}] device: {}'.format(devices[key].humanName, devices[key].macAddress, error))
                 saveDevices(devices)
             time.sleep(self.sleeptime)
 
     def _request(self, m):
         response = None
         logging.debug('Send to jeedom :  {}'.format(m))
-        r = requests.post('{}?apikey={}'.format(self.url, self.apikey),
-                          data=json.dumps(m),
-                          verify=False)
+        r = requests.post('{}?apikey={}'.format(self.url, self.apikey), data=json.dumps(m), verify=False)
+        logging.debug('Status Code :  {}'.format(r.status_code))
         if r.status_code != 200:
-            logging.error(
-                'Error on send request to jeedom, return code {} - {}'.format(r.status_code, r.reason))
+            logging.error('Error on send request to jeedom, return code {} - {}'.format(r.status_code, r.reason))
 
         else:
             response = r.json()
@@ -138,6 +159,86 @@ class JeedomCallback:
             logging.error('Calling jeedom failed')
             return False
         return True
+
+class JeedomHandler(socketserver.BaseRequestHandler):
+    def handle(self):
+        print('Message received in socket')
+        # self.request is the TCP socket connected to the client
+        self.data = self.request.recv(1024)
+        logging.debug("Message received in socket")
+        message = json.loads(self.data.decode())
+        lmessage = dict(message)
+        del lmessage['apikey']
+        logging.debug(lmessage)
+        response = {'result': None, 'success': True}
+        if message.get('apikey') != _apikey:
+            logging.error("Invalid apikey from socket : {}".format(self.data))
+            return
+
+        action = message.get('action')
+        args = message.get('args')
+
+        logging.debug('action: {}'.format(action))
+
+        if action == 'update_device' or action == 'insert_device':
+            id = args[0]
+            name = args[1]
+            macAddress = args[2]
+            devices = loadDevices()
+
+            if devices is None:
+                devices = {}
+
+            if id in devices:
+                devices[id].humanName = name
+                devices[id].deviceId = id
+                devices[id].macAddress = macAddress
+                response['result'] = 'Update OK'
+            else:
+                devices[id] = Phone(macAddress, id)
+                devices[id].humanName = name
+                response['result'] = 'Insert OK'
+
+            saveDevices(devices)
+        
+        if action == 'remove_device':
+            id = args[0]
+            devices = loadDevices()
+
+            if id in devices:
+                del devices[id]
+                response['result'] = 'Remove OK'
+                saveDevices(devices)
+
+        self.request.sendall(json.dumps(response, cls=PhoneEncoder).encode())
+
+
+
+
+    # def get_libversion(self):
+    #     return zigate.__version__
+
+    # def raw_command(self, cmd, data):
+    #     '''
+    #     send raw command to zigate
+    #     '''
+    #     cmd = cmd.lower()
+    #     if 'x' in cmd:
+    #         cmd = int(cmd, 16)
+    #     else:
+    #         cmd = int(cmd)
+    #     return z.send_data(cmd, data)
+
+    # def get_last_responses(self):
+    #     '''
+    #     get last received responses
+    #     '''
+    #     responses = []
+    #     while len(LAST_RESPONSES) > 0 and len(responses) < 15:
+    #         responses.append(LAST_RESPONSES.popleft())
+    #     responses = '\n'.join(responses)
+    #     return responses + '\n'
+
 
 
 def store_response(response):
@@ -170,13 +271,13 @@ def shutdown():
     logging.debug("Shutting down callback server")
     jc.stop()
     logging.debug("Shutting down local server")
-    # server.shutdown()
-    logging.debug("Removing PID file " + str(_pidfile))
-    if os.path.exists(_pidfile):
-        os.remove(_pidfile)
+    server.shutdown()
     logging.debug("Removing Socket file " + str(_sockfile))
     if os.path.exists(_sockfile):
         os.remove(_sockfile)
+    logging.debug("Removing PID file " + str(_pidfile))
+    if os.path.exists(_pidfile):
+        os.remove(_pidfile)
     logging.debug("Exit 0")
 
 
@@ -191,14 +292,14 @@ def saveDevices(devices):
 
 
 def loadDevices():
-    logging.debug("Load devices from file")
+    # logging.debug("Load devices from file")
     # SAVE_LOCK.locked()
     r = None
-    if os.path.exists(DEVICES_FILENAMENAME):
+    if os.path.exists(DEVICES_FILENAME):
         with open(DEVICES_FILENAME, 'r') as fp:
             r = json.load(fp)
             for key, item in r.items():
-                r[key] = Phone.fromJson(item['macAddress'], item['deviceId'],
+                r[key] = Phone.fromJson(item['macAddress'], item['deviceId'], item['humanName'],
                                         item['isReachable'], datetime.fromisoformat(item['lastStateDate']))
     # SAVE_LOCK.release()
     return r
@@ -217,10 +318,8 @@ parser.add_argument('--absentThreshold', help='Time to consider a device absent'
 args = parser.parse_args()
 
 FORMAT = '[%(asctime)-15s][%(levelname)s][%(name)s](%(threadName)s) : %(message)s'
-
 logging.basicConfig(level=convert_log_level(args.loglevel),
                     format=FORMAT, datefmt="%Y-%m-%d %H:%M:%S")
-
 urllib3_logger = logging.getLogger('urllib3')
 urllib3_logger.setLevel(logging.CRITICAL)
 
@@ -234,6 +333,7 @@ logging.info('Callback : {}'.format(args.callback))
 logging.info('Interval : {}'.format(args.interval))
 logging.info('AbsentThreshold: {}'.format(args.absentThreshold))
 logging.info('Python version : {}'.format(sys.version))
+logging.info('DEVICES_FILENAME : {}'.format(DEVICES_FILENAME))
 
 _pidfile = args.pidfile
 _sockfile = args.socket
@@ -242,9 +342,7 @@ _apikey = args.apikey
 signal.signal(signal.SIGINT, handler)
 signal.signal(signal.SIGTERM, handler)
 
-
-persistent_file = os.path.join(os.path.dirname(
-    __file__), '{}.json'.format(PLUGIN_NAME))
+persistent_file = os.path.join(os.path.dirname(__file__), '{}.json'.format(PLUGIN_NAME))
 
 pid = str(os.getpid())
 logging.debug("Writing PID " + pid + " to " + str(args.pidfile))
@@ -254,3 +352,11 @@ with open(args.pidfile, 'w') as fp:
 jc = JeedomCallback(args.apikey, args.callback, int(args.interval))
 # if not jc.test():
 #     sys.exit()
+
+if os.path.exists(args.socket):
+    os.unlink(args.socket)
+server = socketserver.UnixStreamServer(args.socket, JeedomHandler)
+
+t = threading.Thread(target=server.serve_forever)
+t.start()
+
