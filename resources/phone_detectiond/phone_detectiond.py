@@ -24,7 +24,7 @@ from datetime import date, datetime, timedelta
 BASE_PATH = os.path.join(os.path.dirname(__file__), '..', '..', '..', '..')
 BASE_PATH = os.path.abspath(BASE_PATH)
 PLUGIN_NAME = "phone_detection"
-SAVE_LOCK = threading.Lock()
+FILELOCK = threading.RLock()
 
 # DEVICES_FILENAME = os.path.join(BASE_PATH, "devices.json")
 DEVICES_FILENAME = os.path.join(BASE_PATH, "plugins", "phone_detection", "devices.json")
@@ -93,13 +93,33 @@ class PhoneEncoder(json.JSONEncoder):
 
         return json.JSONEncoder.default(self, obj)
 
+class CheckDevice:
+    def __init__(self, device, btController):
+        logging.info('Try to get \'{}\' informations'.format(device.humanName))
+        self.device = device
+        self.mustUpdate = False
+        self.btController = btController
+
+    def start(self):
+        self.thread = threading.Thread(target=self.run)
+        self.thread.start()
+        return self.thread
+    
+    def run(self):
+        result = subprocess.run(['sudo', 'hcitool','-i', self.btController, 'name', self.device.macAddress], stdout=subprocess.PIPE)
+        if result.stdout:
+            self.mustUpdate = self.device.setReachable()
+        else:
+            self.mustUpdate = self.device.setNotReachable()
+
 
 class JeedomCallback:
-    def __init__(self, apikey, url, sleeptime):
+    def __init__(self, apikey, url, sleeptime, btController):
         logging.info('Create {} daemon'.format(PLUGIN_NAME))
         self.apikey = apikey
         self.url = url
         self.sleeptime = sleeptime
+        self.btController = btController
         self.messages = []
         self._stop = False
         self.Thread = threading.Thread(target=self.run)
@@ -113,24 +133,40 @@ class JeedomCallback:
         while not self._stop:
             devices = loadDevices()
             if devices is not None:
+                threads = {}
                 for key in devices:
                     logging.debug('Ping {} [{}] phone'.format(devices[key].humanName, devices[key].macAddress))
                     try:
-                        result = subprocess.run(['sudo', 'hcitool', 'name', devices[key].macAddress], stdout=subprocess.PIPE)
-                        # logging.debug('Result: {}'.format(result.stdout))
-                        mustUpdate = False
-                        if result.stdout:
-                            mustUpdate = devices[key].setReachable()
-                        else:
-                            mustUpdate = devices[key].setNotReachable()
+                        # result = subprocess.run(['sudo', 'hcitool', 'name', devices[key].macAddress], stdout=subprocess.PIPE)
+                        # # logging.debug('Result: {}'.format(result.stdout))
+                        # mustUpdate = False
+                        # if result.stdout:
+                        #     mustUpdate = devices[key].setReachable()
+                        # else:
+                        #     mustUpdate = devices[key].setNotReachable()
 
-                        logging.debug('Send device status to Jeedom ? {}'.format(mustUpdate))
-                        if mustUpdate:
-                            logging.info('{} status has changed to \'{}\'! Notify Jeedom.'.format(devices[key].humanName, ('absent','present')[devices[key].isReachable]))
-                            self.send_now({'id' : int(key), 'value': (0,1)[devices[key].isReachable]})
+                        # logging.debug('Send device status to Jeedom ? {}'.format(mustUpdate))
+                        # if mustUpdate:
+                        #     logging.info('{} status has changed to \'{}\'! Notify Jeedom.'.format(devices[key].humanName, ('absent','present')[devices[key].isReachable]))
+                        #     self.send_now({'id' : int(key), 'value': (0,1)[devices[key].isReachable]})
 
+                        threads[key] = CheckDevice(devices[key], self.btController)
+                        threads[key].start()
                     except Exception as error:
                         logging.error('Error on ping {} [{}] device: {}'.format(devices[key].humanName, devices[key].macAddress, error))
+
+                for key in threads:
+                    logging.info('\t=> {}'.format(key))
+                    threads[key].thread.join()
+
+                logging.info('Waiting for all thread')
+
+                for key in threads:
+                    logging.info('Send device status to Jeedom ? {}/{}'.format(threads[key].device.humanName, threads[key].mustUpdate))
+                    if threads[key].mustUpdate:
+                        logging.info('{} status has changed to \'{}\'! Notify Jeedom.'.format(threads[key].device.humanName, ('absent','present')[threads[key].device.isReachable]))
+                        self.send_now({'id' : int(key), 'value': (0,1)[threads[key].device.isReachable]})
+
                 saveDevices(devices)
             time.sleep(self.sleeptime)
 
@@ -286,9 +322,10 @@ def saveDevices(devices):
     logging.debug("Save devices to file")
 
     # SAVE_LOCK.locked()
-    with open(DEVICES_FILENAME, 'w') as fp:
-        json.dump(devices, fp, cls=PhoneEncoder, sort_keys=True,
-                  indent=4, separators=(',', ': '))
+    with FILELOCK:
+        with open(DEVICES_FILENAME, 'w') as fp:
+            json.dump(devices, fp, cls=PhoneEncoder, sort_keys=True,
+                    indent=4, separators=(',', ': '))
     # SAVE_LOCK.release()
 
 
@@ -297,11 +334,12 @@ def loadDevices():
     # SAVE_LOCK.locked()
     r = None
     if os.path.exists(DEVICES_FILENAME):
-        with open(DEVICES_FILENAME, 'r') as fp:
-            r = json.load(fp)
-            for key, item in r.items():
-                r[key] = Phone.fromJson(item['macAddress'], item['deviceId'], item['humanName'],
-                                        item['isReachable'], datetime.fromisoformat(item['lastStateDate']))
+        with FILELOCK:
+            with open(DEVICES_FILENAME, 'r') as fp:
+                r = json.load(fp)
+                for key, item in r.items():
+                    r[key] = Phone.fromJson(item['macAddress'], item['deviceId'], item['humanName'],
+                                            item['isReachable'], datetime.fromisoformat(item['lastStateDate']))
     # SAVE_LOCK.release()
     return r
 
@@ -350,7 +388,7 @@ logging.debug("Writing PID " + pid + " to " + str(args.pidfile))
 with open(args.pidfile, 'w') as fp:
     fp.write("%s\n" % pid)
 
-jc = JeedomCallback(args.apikey, args.callback, int(args.interval))
+jc = JeedomCallback(args.apikey, args.callback, int(args.interval), args.device)
 # if not jc.test():
 #     sys.exit()
 
