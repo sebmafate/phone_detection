@@ -126,7 +126,7 @@ class JeedomCallback:
 
                         logging.debug('Send device status to Jeedom ? {}'.format(mustUpdate))
                         if mustUpdate:
-                            logging.info('{} status has changed to \'{}\'! Notify Jeedom.'.format(devices[key].humanName, ('present', 'absent')[devices[key].isReachable]))
+                            logging.info('{} status has changed to \'{}\'! Notify Jeedom.'.format(devices[key].humanName, ('absent','present')[devices[key].isReachable]))
                             self.send_now({'id' : int(key), 'value': (0,1)[devices[key].isReachable]})
 
                     except Exception as error:

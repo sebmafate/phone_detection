@@ -36,7 +36,7 @@ class phone_detection extends eqLogic
     //   }
     // }
 
-        /**
+    /**
      * Call the call Python daemon.
      *
      * @param  string $action Action calling.
@@ -411,16 +411,18 @@ class phone_detectionCmd extends cmd
 		$macAddress = $phone_detectionObj->getConfiguration('macAddress');
     		log::add('phone_detection','debug', 'mac address: '.$macAddress);
 	
-	    // On ping le device pour savoir s'il est là
-	    $name = shell_exec("sudo hcitool -i hci0 name $macAddress");
-	    log::add('phone_detection', 'debug', 'device name:'.$x);
+        // On ping le device pour savoir s'il est là
+        $btController = $phone_detectionObj->getConfiguration('btport');
+        log::add('phone_detection','info', 'BT Device: '.$btController);
+	    // $name = shell_exec("sudo hcitool -i hci0 name $macAddress");
+	    // log::add('phone_detection', 'debug', 'device name:'.$x);
 
-	    $state = (empty($name) ? 0 : 1);
+	    // $state = (empty($name) ? 0 : 1);
 
             // On lui ajoute un évènement avec pour information 'Données de test'
-            $dataCmd->event($state);
+            // $dataCmd->event($state);
             // On sauvegarde cet évènement
-	    $dataCmd->save();
+	    // $dataCmd->save();
 
 
         }

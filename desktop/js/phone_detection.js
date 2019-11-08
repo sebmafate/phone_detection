@@ -11,10 +11,6 @@ function addCmdToTable(_cmd) {
                 <input class="cmdAttr form-control input-sm" data-l1key="name"> \
               </td> \
               <td> \
-                <span class="type" type="' + init(_cmd.type) + '">' + jeedom.cmd.availableType() + '</span> \
-                <span class="subType" subType="' + init(_cmd.subType) + '"></span> \
-              </td> \
-              <td> \
                 <span>\
                 <label class="checkbox-inline"><input type="checkbox" class="cmdAttr checkbox-inline" data-l1key="isHistorized" checked/>{{Historiser}}</label> \
               </span> \
@@ -31,4 +27,11 @@ function addCmdToTable(_cmd) {
     $('#table_cmd tbody tr:last').setValues(_cmd, '.cmdAttr');
     // Initialise les fonctionnalités de la ligne
     jeedom.cmd.changeType($('#table_cmd tbody tr:last'), init(_cmd.subType));
+
+
+  //   <td> \
+  //   <span class="type" type="' + init(_cmd.type) + '">' + jeedom.cmd.availableType() + '</span> \
+  //   <span class="subType" subType="' + init(_cmd.subType) + '"></span> \
+  // </td> \
+
 }

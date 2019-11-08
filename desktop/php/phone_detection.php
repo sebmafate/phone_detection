@@ -28,11 +28,11 @@ $eqLogics = eqLogic::byType($plugin->getId());
           <!-- Filtre des objets -->
           <li class="filter" style="margin-bottom: 5px; width: 100%"><input class="filter form-control input-sm" placeholder="{{Rechercher}}"/></li>
           <!-- Liste des objets -->
-            <?php foreach ($eqLogics as $eqLogic) : ?>
+            <?php foreach ($eqLogics as $eqLogic): ?>
               <li class="cursor li_eqLogic" data-eqLogic_id="<?php echo $eqLogic->getId(); ?>">
                 <a><?php echo $eqLogic->getHumanName(true); ?></a>
               </li>
-            <?php endforeach; ?>
+            <?php endforeach;?>
         </ul>
       </div>
     </div>
@@ -65,8 +65,7 @@ $eqLogics = eqLogic::byType($plugin->getId());
 	</style>
       <div class="eqLogicThumbnailContainer">
         <!-- Boucle sur les objects -->
-          <?php
-          foreach ($eqLogics as $eqLogic) : ?>
+          <?php foreach ($eqLogics as $eqLogic): ?>
             <div class="eqLogicDisplayCard cursor" data-eqLogic_id="<?php echo $eqLogic->getId(); ?>"
                  style="position: absolute; left: 0px; top: 0px;">
 	      <i class="fa fa-mobile" style="font-size : 6em;color:white; margin: 0 auto; padding: 12pt 8pt; background-color:deepskyblue; width:75px !important;height:75px !important; border-radius:16px;"></i>
@@ -74,7 +73,7 @@ $eqLogics = eqLogic::byType($plugin->getId());
 			<?php echo $eqLogic->getHumanName(true, true); ?>
 	      </span>
             </div>
-          <?php endforeach; ?>
+          <?php endforeach;?>
       </div>
     </div>
     <!-- Container du panneau de contrôle -->
@@ -130,15 +129,15 @@ $eqLogics = eqLogic::byType($plugin->getId());
                     </div>
                   </div>
                   <div class="form-group">
-                    <label class="col-sm-6 control-label" >{{Objet parent}}</label>  
+                    <label class="col-sm-6 control-label" >{{Objet parent}}</label>
                     <div class="col-sm-6">
                       <select id="sel_object" class="eqLogicAttr form-control" data-l1key="object_id">
                         <option value="">{{Aucun}}</option>
                         <?php
-                            foreach (jeeObject::all() as $object) {
-                            echo '<option value="' . $object->getId() . '">' . $object->getName() . '</option>';
-                          }
-                        ?> 
+foreach (jeeObject::all() as $object) {
+    echo '<option value="' . $object->getId() . '">' . $object->getName() . '</option>';
+}
+?>
                       </select>
                     </div>
                   </div>
@@ -175,8 +174,8 @@ $eqLogics = eqLogic::byType($plugin->getId());
           <table id="table_cmd" class="table table-bordered table-condensed">
             <thead>
             <tr>
-              <th style="width: 300px;">{{Nom}}</th>
-              <th>{{Type}}</th>
+              <th style="width: 450px;">{{Nom}}</th>
+              <!-- <th>{{Type}}</th> -->
               <th>{{Historique}}</th>
               <th>{{Actions}}</th>
             </tr>
