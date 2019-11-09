@@ -414,6 +414,7 @@ class phone_detectionCmd extends cmd
         // On ping le device pour savoir s'il est là
         $btController = $phone_detectionObj->getConfiguration('btport');
         log::add('phone_detection','info', 'BT Device: '.$btController);
+        
 	    // $name = shell_exec("sudo hcitool -i hci0 name $macAddress");
 	    // log::add('phone_detection', 'debug', 'device name:'.$x);
 

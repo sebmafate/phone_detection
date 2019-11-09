@@ -19,6 +19,8 @@ import uuid
 import subprocess
 import collections
 
+from multiprocessing.dummy import Pool as ThreadPool
+
 from datetime import date, datetime, timedelta
 
 BASE_PATH = os.path.join(os.path.dirname(__file__), '..', '..', '..', '..')
@@ -42,25 +44,33 @@ class Phone:
         self.humanName = ''
         self.isReachable = False
         self.lastStateDate = datetime.now()
+        self.mustUpdate = False
 
     def setReachable(self):
+        self.lastStateDate = datetime.now()
         if not self.isReachable:
             self.isReachable = True
-            self.lastStateDate = datetime.now()
             logging.info('Set {}\'s phone present'.format(self.humanName))
+            self.mustUpdate = True
             return True
+
+        self.mustUpdate = False
         return False
 
     def setNotReachable(self):
         thresholdDate = self.lastStateDate + timedelta(seconds=int(args.absentThreshold))
         logging.debug('lastStateDate: {}'.format(self.lastStateDate))
         logging.debug('thresholdDate: {}'.format(thresholdDate))
+        logging.debug('datetime.now(): {}'.format(datetime.now()))
         logging.debug('is datetime.now() > thresholdDate ? {}'.format(datetime.now() > thresholdDate))
         if self.isReachable and datetime.now() > thresholdDate:
             self.isReachable = False
             self.lastStateDate = datetime.now()
             logging.info('Set {}\'s phone absent'.format(self.humanName))
+            self.mustUpdate = True
             return True
+        
+        self.mustUpdate = False
         return False
 
     def toJson(self):
@@ -95,7 +105,7 @@ class PhoneEncoder(json.JSONEncoder):
 
 class CheckDevice:
     def __init__(self, device, btController):
-        logging.info('Try to get \'{}\' informations'.format(device.humanName))
+        logging.debug('Try to get \'{}\' informations'.format(device.humanName))
         self.device = device
         self.mustUpdate = False
         self.btController = btController
@@ -112,6 +122,36 @@ class CheckDevice:
         else:
             self.mustUpdate = self.device.setNotReachable()
 
+class CheckDevicesPool:
+    def __init__(self, maxThread, btController, devices):
+        self.maxThread = maxThread
+        self.btController = btController
+        self.devices = devices
+    
+    def _GetDeviceInformation(self, key):
+        logging.debug('Get device information {}'.format(key))
+        result = subprocess.run(['sudo', 'hcitool','-i', self.btController, 'name', self.devices[key].macAddress], stdout=subprocess.PIPE)
+        if result.stdout:
+            logging.debug('{} is present'.format(key))
+            self.devices[key].setReachable()
+        else:
+            logging.debug('{} is absent'.format(key))
+            self.devices[key].setNotReachable()
+
+        logging.debug('{} {}'.format(key, ("is up to date", 'must be update')[self.devices[key].mustUpdate]))
+    
+    def CheckAllDevices(self, callback):
+        logging.debug('Check all devices')
+        pool = ThreadPool(self.maxThread)
+        pool.map(self._GetDeviceInformation, self.devices.keys())
+        pool.close()
+        pool.join()
+
+        for key in self.devices:
+            logging.debug('Send device status to Jeedom ? {}/{}'.format(self.devices[key].humanName, self.devices[key].mustUpdate))
+            if self.devices[key].mustUpdate:
+                logging.debug('{} status has changed to \'{}\'! Notify Jeedom.'.format(self.devices[key].humanName, ('absent','present')[self.devices[key].isReachable]))
+                callback.send_now({'action': 'update_device_status', 'id' : int(key), 'value': (0,1)[self.devices[key].isReachable]})
 
 class JeedomCallback:
     def __init__(self, apikey, url, sleeptime, btController):
@@ -133,39 +173,8 @@ class JeedomCallback:
         while not self._stop:
             devices = loadDevices()
             if devices is not None:
-                threads = {}
-                for key in devices:
-                    logging.debug('Ping {} [{}] phone'.format(devices[key].humanName, devices[key].macAddress))
-                    try:
-                        # result = subprocess.run(['sudo', 'hcitool', 'name', devices[key].macAddress], stdout=subprocess.PIPE)
-                        # # logging.debug('Result: {}'.format(result.stdout))
-                        # mustUpdate = False
-                        # if result.stdout:
-                        #     mustUpdate = devices[key].setReachable()
-                        # else:
-                        #     mustUpdate = devices[key].setNotReachable()
-
-                        # logging.debug('Send device status to Jeedom ? {}'.format(mustUpdate))
-                        # if mustUpdate:
-                        #     logging.info('{} status has changed to \'{}\'! Notify Jeedom.'.format(devices[key].humanName, ('absent','present')[devices[key].isReachable]))
-                        #     self.send_now({'id' : int(key), 'value': (0,1)[devices[key].isReachable]})
-
-                        threads[key] = CheckDevice(devices[key], self.btController)
-                        threads[key].start()
-                    except Exception as error:
-                        logging.error('Error on ping {} [{}] device: {}'.format(devices[key].humanName, devices[key].macAddress, error))
-
-                for key in threads:
-                    logging.info('\t=> {}'.format(key))
-                    threads[key].thread.join()
-
-                logging.info('Waiting for all thread')
-
-                for key in threads:
-                    logging.info('Send device status to Jeedom ? {}/{}'.format(threads[key].device.humanName, threads[key].mustUpdate))
-                    if threads[key].mustUpdate:
-                        logging.info('{} status has changed to \'{}\'! Notify Jeedom.'.format(threads[key].device.humanName, ('absent','present')[threads[key].device.isReachable]))
-                        self.send_now({'id' : int(key), 'value': (0,1)[threads[key].device.isReachable]})
+                pool = CheckDevicesPool(2, self.btController, devices)
+                pool.CheckAllDevices(self)
 
                 saveDevices(devices)
             time.sleep(self.sleeptime)
@@ -246,38 +255,8 @@ class JeedomHandler(socketserver.BaseRequestHandler):
 
         self.request.sendall(json.dumps(response, cls=PhoneEncoder).encode())
 
-
-
-
-    # def get_libversion(self):
-    #     return zigate.__version__
-
-    # def raw_command(self, cmd, data):
-    #     '''
-    #     send raw command to zigate
-    #     '''
-    #     cmd = cmd.lower()
-    #     if 'x' in cmd:
-    #         cmd = int(cmd, 16)
-    #     else:
-    #         cmd = int(cmd)
-    #     return z.send_data(cmd, data)
-
-    # def get_last_responses(self):
-    #     '''
-    #     get last received responses
-    #     '''
-    #     responses = []
-    #     while len(LAST_RESPONSES) > 0 and len(responses) < 15:
-    #         responses.append(LAST_RESPONSES.popleft())
-    #     responses = '\n'.join(responses)
-    #     return responses + '\n'
-
-
-
 def store_response(response):
     LAST_RESPONSES.append(str(response))
-
 
 def convert_log_level(level='error'):
     LEVELS = {'debug': logging.DEBUG,
@@ -389,8 +368,8 @@ with open(args.pidfile, 'w') as fp:
     fp.write("%s\n" % pid)
 
 jc = JeedomCallback(args.apikey, args.callback, int(args.interval), args.device)
-# if not jc.test():
-#     sys.exit()
+if not jc.test():
+    sys.exit()
 
 if os.path.exists(args.socket):
     os.unlink(args.socket)
