@@ -10,12 +10,13 @@ if (!jeedom::apiAccess(init('apikey'), 'phone_detection')) {
 $results = json_decode(file_get_contents("php://input"), true);
 // $response = array('success' => false);
 $action = $results['action'];
+$value = 0;
 
+$id = $results['id'];
+log::add('phone_detection', 'debug', 'id: '.$id);
 switch ($action) {
     case "update_device_status":
-        $id = $results['id'];
         $value = $results['value'];
-        log::add('phone_detection', 'debug', 'id: '.$id);
         log::add('phone_detection', 'debug', 'value: '.$value);
 
         $eqLogic = eqLogic::byId($id);
@@ -30,9 +31,15 @@ switch ($action) {
     case "test":
         $success = true;
         break;
+
+    case "get_status":
+        $eqLogic = eqLogic::byId($id);
+        $statePropertyCmd = $eqLogic->getCmd('info', 'state');
+        $value = $statePropertyCmd->execCmd();
+        break;
 }
 
-$response = array('success' => $success);
+$response = array('success' => $success, 'value' => $value);
 
 echo json_encode($response);
 ?>

@@ -18,6 +18,7 @@ import threading
 import uuid
 import subprocess
 import collections
+import gc
 
 from multiprocessing.dummy import Pool as ThreadPool
 
@@ -28,6 +29,7 @@ BASE_PATH = os.path.abspath(BASE_PATH)
 PLUGIN_NAME = "phone_detection"
 FILELOCK = threading.RLock()
 
+
 # DEVICES_FILENAME = os.path.join(BASE_PATH, "devices.json")
 DEVICES_FILENAME = os.path.join(BASE_PATH, "plugins", "phone_detection", "devices.json")
 
@@ -35,7 +37,7 @@ DEVICES_FILENAME = os.path.join(BASE_PATH, "plugins", "phone_detection", "device
 LAST_RESPONSES = collections.deque([], 15)
 
 DEVICES = {}
-
+THREADS = {}
 
 class Phone:
     def __init__(self, macAddress, deviceId):
@@ -91,6 +93,53 @@ class Phone:
         obj.humanName = humanName
         return obj
 
+class PhoneDetection:
+    def __init__(self, device, btController, interval, callback):
+        self.device = device
+        self.btController = btController
+        self.interval = interval
+        self._stop = False
+        self.callback = callback
+        self.t = threading.Thread(target=self._run)
+        self.t.daemon = True
+
+    def start(self):
+        logging.debug('Start thread detection for {} [{}]'.format(self.device.humanName, self.device.macAddress))
+
+        deviceStatus = self.callback.send_now({'action':'get_status', 'id':int(self.device.deviceId)})
+        logging.debug('Jeedom {} device status: {}'.format(self.device.deviceId, deviceStatus['value']))
+        self.device.isReachable = deviceStatus['value'] == 1
+        self._stop = False
+        self.t.start()
+    
+    def stop(self, waitForStop = True):
+        logging.debug('Stop thread detection for {} [{}]'.format(self.device.humanName, self.device.macAddress))
+        self._stop = True
+        if waitForStop:
+            self.t.join()
+            del self.t 
+            gc.collect()
+    
+    def GetPhoneInformation(self):
+        logging.debug('Get phone information {}'.format(self.device.deviceId))
+        result = subprocess.run(['sudo', 'hcitool', '-i', self.btController, 'name', self.device.macAddress], stdout = subprocess.PIPE)
+        if result.stdout:
+            logging.debug('{} is present'.format(self.device.deviceId))
+            self.device.setReachable()
+        else:
+            logging.debug('{} is absent'.format(self.device.deviceId))
+            self.device.setNotReachable()
+        
+        logging.debug('{} {}'.format(self.device.deviceId, ("is up to date", "must be update")[self.device.mustUpdate]))
+
+    def _run(self):
+        while not self._stop:
+            self.GetPhoneInformation()
+            if self.device.mustUpdate:
+                logging.debug('{} status has changed to \'{}\'! Notify Jeedom.'.format(self.device.humanName, ('absent','present')[self.device.isReachable]))
+                self.callback.send_now({'action': 'update_device_status', 'id' : int(self.device.deviceId), 'value': (0,1)[self.device.isReachable]})
+                # saveDevices()
+            time.sleep(self.interval)
 
 class PhoneEncoder(json.JSONEncoder):
     def default(self, obj):  # pylint: disable=E0202
@@ -103,55 +152,35 @@ class PhoneEncoder(json.JSONEncoder):
 
         return json.JSONEncoder.default(self, obj)
 
-class CheckDevice:
-    def __init__(self, device, btController):
-        logging.debug('Try to get \'{}\' informations'.format(device.humanName))
-        self.device = device
-        self.mustUpdate = False
-        self.btController = btController
-
-    def start(self):
-        self.thread = threading.Thread(target=self.run)
-        self.thread.start()
-        return self.thread
+# class CheckDevicesPool:
+#     def __init__(self, maxThread, btController, devices):
+#         self.maxThread = maxThread
+#         self.btController = btController
+#         self.devices = devices
     
-    def run(self):
-        result = subprocess.run(['sudo', 'hcitool','-i', self.btController, 'name', self.device.macAddress], stdout=subprocess.PIPE)
-        if result.stdout:
-            self.mustUpdate = self.device.setReachable()
-        else:
-            self.mustUpdate = self.device.setNotReachable()
+#     def _GetDeviceInformation(self, key):
+#         logging.debug('Get device information {}'.format(key))
+#         result = subprocess.run(['sudo', 'hcitool','-i', self.btController, 'name', self.devices[key].macAddress], stdout=subprocess.PIPE)
+#         if result.stdout:
+#             logging.debug('{} is present'.format(key))
+#             self.devices[key].setReachable()
+#         else:
+#             logging.debug('{} is absent'.format(key))
+#             self.devices[key].setNotReachable()
 
-class CheckDevicesPool:
-    def __init__(self, maxThread, btController, devices):
-        self.maxThread = maxThread
-        self.btController = btController
-        self.devices = devices
+#         logging.debug('{} {}'.format(key, ("is up to date", 'must be update')[self.devices[key].mustUpdate]))
     
-    def _GetDeviceInformation(self, key):
-        logging.debug('Get device information {}'.format(key))
-        result = subprocess.run(['sudo', 'hcitool','-i', self.btController, 'name', self.devices[key].macAddress], stdout=subprocess.PIPE)
-        if result.stdout:
-            logging.debug('{} is present'.format(key))
-            self.devices[key].setReachable()
-        else:
-            logging.debug('{} is absent'.format(key))
-            self.devices[key].setNotReachable()
+#     def CheckAllDevices(self, callback):
+#         logging.debug('Check all devices')
+        
+#         for key in self.devices:
+#             self._GetDeviceInformation(key)
 
-        logging.debug('{} {}'.format(key, ("is up to date", 'must be update')[self.devices[key].mustUpdate]))
-    
-    def CheckAllDevices(self, callback):
-        logging.debug('Check all devices')
-        pool = ThreadPool(self.maxThread)
-        pool.map(self._GetDeviceInformation, self.devices.keys())
-        pool.close()
-        pool.join()
-
-        for key in self.devices:
-            logging.debug('Send device status to Jeedom ? {}/{}'.format(self.devices[key].humanName, self.devices[key].mustUpdate))
-            if self.devices[key].mustUpdate:
-                logging.debug('{} status has changed to \'{}\'! Notify Jeedom.'.format(self.devices[key].humanName, ('absent','present')[self.devices[key].isReachable]))
-                callback.send_now({'action': 'update_device_status', 'id' : int(key), 'value': (0,1)[self.devices[key].isReachable]})
+#         for key in self.devices:
+#             logging.debug('Send device status to Jeedom ? {}/{}'.format(self.devices[key].humanName, self.devices[key].mustUpdate))
+#             if self.devices[key].mustUpdate:
+#                 logging.debug('{} status has changed to \'{}\'! Notify Jeedom.'.format(self.devices[key].humanName, ('absent','present')[self.devices[key].isReachable]))
+#                 callback.send_now({'action': 'update_device_status', 'id' : int(key), 'value': (0,1)[self.devices[key].isReachable]})
 
 class JeedomCallback:
     def __init__(self, apikey, url, sleeptime, btController):
@@ -161,23 +190,6 @@ class JeedomCallback:
         self.sleeptime = sleeptime
         self.btController = btController
         self.messages = []
-        self._stop = False
-        self.Thread = threading.Thread(target=self.run)
-        self.daemon = True
-        self.Thread.start()
-
-    def stop(self):
-        self._stop = True
-
-    def run(self):
-        while not self._stop:
-            devices = loadDevices()
-            if devices is not None:
-                pool = CheckDevicesPool(2, self.btController, devices)
-                pool.CheckAllDevices(self)
-
-                saveDevices(devices)
-            time.sleep(self.sleeptime)
 
     def _request(self, m):
         response = None
@@ -227,36 +239,85 @@ class JeedomHandler(socketserver.BaseRequestHandler):
             id = args[0]
             name = args[1]
             macAddress = args[2]
-            devices = loadDevices()
+            # devices = loadDevices()
 
-            if devices is None:
-                devices = {}
+            # if devices is None:
+            #     devices = {}
 
-            if id in devices:
-                devices[id].humanName = name
-                devices[id].deviceId = id
-                devices[id].macAddress = macAddress
+            if id in DEVICES:
+                logging.debug('Update device in device.json')
+                DEVICES[id].humanName = name
+                DEVICES[id].deviceId = id
+                DEVICES[id].macAddress = macAddress
+                if id in THREADS:
+                    THREADS[id].stop()
                 response['result'] = 'Update OK'
             else:
-                devices[id] = Phone(macAddress, id)
-                devices[id].humanName = name
+                logging.debug('Add new device in device.json')
+                DEVICES[id] = Phone(macAddress, id)
+                DEVICES[id].humanName = name
+                THREADS[id] = PhoneDetection(DEVICES[id], BTCONTROLLER, INTERVAL, jc)
                 response['result'] = 'Insert OK'
 
-            saveDevices(devices)
+            # logging.debug('Save devices')
+            # saveDevices(DEVICES)
+            THREADS[id].start()
+
         
         if action == 'remove_device':
             id = args[0]
-            devices = loadDevices()
+            # devices = loadDevices()
 
-            if id in devices:
-                del devices[id]
+            if id in DEVICES:
+                del DEVICES[id]
+                if id in THREADS:
+                    THREADS[id].stop()
+                    del THREADS[id]
                 response['result'] = 'Remove OK'
-                saveDevices(devices)
+                #saveDevices(devices)
 
         self.request.sendall(json.dumps(response, cls=PhoneEncoder).encode())
 
-def store_response(response):
-    LAST_RESPONSES.append(str(response))
+class DevicesFileHandler:
+    def __init__(self, interval = 60, devices = DEVICES):
+        self.interval = interval
+        self._stop = False
+        self.t = threading.Thread(target=self._run)
+        self.t.daemon = True
+        self.loadDevices()
+        self.devices = devices
+        self.t.start()
+
+    def _run(self):
+        while not self._stop:
+            self.saveDevices()
+            time.sleep(self.interval)
+
+    def saveDevices(self, devices = DEVICES):
+        logging.debug("Save devices to file")
+        with FILELOCK:
+            with open(DEVICES_FILENAME, 'w') as fp:
+                json.dump(devices, fp, cls=PhoneEncoder, sort_keys=True,
+                        indent=4, separators=(',', ': '))
+
+    def loadDevices(self):
+        # logging.debug("Load devices from file")
+        r = None
+        if os.path.exists(DEVICES_FILENAME):
+            with FILELOCK:
+                with open(DEVICES_FILENAME, 'r') as fp:
+                    r = json.load(fp)
+                    for key, item in r.items():
+                        r[key] = Phone.fromJson(item['macAddress'], item['deviceId'], item['humanName'],
+                                                item['isReachable'], datetime.fromisoformat(item['lastStateDate']))
+        self.devices= r
+
+    def stop(self, waitForStop = True):
+        self._stop = True
+        if waitForStop:
+            self.t.join()
+            del self.t 
+            gc.collect()
 
 def convert_log_level(level='error'):
     LEVELS = {'debug': logging.DEBUG,
@@ -268,12 +329,10 @@ def convert_log_level(level='error'):
               'none': logging.NOTSET}
     return LEVELS.get(level, logging.NOTSET)
 
-
 def handler(signum=None, frame=None):
     logging.debug("Signal %i caught, exiting..." % int(signum))
     print("Signal %i caught, exiting..." % int(signum))
     shutdown()
-
 
 def shutdown():
     logging.info("Shutdown")
@@ -281,8 +340,16 @@ def shutdown():
     # z.save_state()
     # logging.debug('Closing {}'.format(PLUGIN_NAME))
     # z.close()
-    logging.info("Shutting down callback server")
-    jc.stop()
+    # logging.info("Shutting down callback server")
+    # jc.stop()
+    logging.info("Stopping all threads")
+    for key in THREADS:
+        logging.info("\t==> {}".format(THREADS[key].device.humanName))
+        THREADS[key].stop(False)
+    
+    logging.info("Stopping devices file hander")
+    devicesFileHanlder.stop(False)
+
     logging.info("Shutting down local server")
     server.shutdown()
     # if handlerThread.isAlive():
@@ -295,33 +362,6 @@ def shutdown():
     if os.path.exists(_pidfile):
         os.remove(_pidfile)
     logging.info("Exit 0")
-
-
-def saveDevices(devices):
-    logging.debug("Save devices to file")
-
-    # SAVE_LOCK.locked()
-    with FILELOCK:
-        with open(DEVICES_FILENAME, 'w') as fp:
-            json.dump(devices, fp, cls=PhoneEncoder, sort_keys=True,
-                    indent=4, separators=(',', ': '))
-    # SAVE_LOCK.release()
-
-
-def loadDevices():
-    # logging.debug("Load devices from file")
-    # SAVE_LOCK.locked()
-    r = None
-    if os.path.exists(DEVICES_FILENAME):
-        with FILELOCK:
-            with open(DEVICES_FILENAME, 'r') as fp:
-                r = json.load(fp)
-                for key, item in r.items():
-                    r[key] = Phone.fromJson(item['macAddress'], item['deviceId'], item['humanName'],
-                                            item['isReachable'], datetime.fromisoformat(item['lastStateDate']))
-    # SAVE_LOCK.release()
-    return r
-
 
 ### Init & Start
 parser = argparse.ArgumentParser()
@@ -357,6 +397,9 @@ _pidfile = args.pidfile
 _sockfile = args.socket
 _apikey = args.apikey
 
+BTCONTROLLER = args.device
+INTERVAL = int(args.interval)
+
 signal.signal(signal.SIGINT, handler)
 signal.signal(signal.SIGTERM, handler)
 
@@ -377,4 +420,12 @@ server = socketserver.UnixStreamServer(args.socket, JeedomHandler)
 
 handlerThread = threading.Thread(target=server.serve_forever)
 handlerThread.start()
+
+devicesFileHanlder = DevicesFileHandler(60, DEVICES)
+
+# Démarrage des threads
+THREADS = {}
+for key in DEVICES:
+    THREADS[key] = PhoneDetection(DEVICES[key], args.device, int(args.interval), jc)
+    THREADS[key].start()
 

@@ -412,18 +412,22 @@ class phone_detectionCmd extends cmd
     		log::add('phone_detection','debug', 'mac address: '.$macAddress);
 	
         // On ping le device pour savoir s'il est là
-        $btController = $phone_detectionObj->getConfiguration('btport');
-        log::add('phone_detection','info', 'BT Device: '.$btController);
-        
-	    // $name = shell_exec("sudo hcitool -i hci0 name $macAddress");
-	    // log::add('phone_detection', 'debug', 'device name:'.$x);
+        $btController = config::byKey('btport', 'phone_detection');
 
-	    // $state = (empty($name) ? 0 : 1);
+        // $btController = $phone_detectionObj->getConfiguration('btport');
+        log::add('phone_detection','info', 'BT Device: '.$btController);
+
+        $btController = ( $btController == '' ? 'hci0' : $btController );
+        
+	    $name = shell_exec("sudo hcitool -i ". $btController ." name $macAddress");
+	    log::add('phone_detection', 'debug', 'device name:'.$x);
+
+	    $state = (empty($name) ? 0 : 1);
 
             // On lui ajoute un évènement avec pour information 'Données de test'
-            // $dataCmd->event($state);
-            // On sauvegarde cet évènement
-	    // $dataCmd->save();
+        $dataCmd->event($state);
+        // On sauvegarde cet évènement
+	    $dataCmd->save();
 
 
         }
