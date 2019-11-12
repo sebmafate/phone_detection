@@ -10,32 +10,6 @@ class phone_detection extends eqLogic
 
     /************* Static methods ************/
 
-    // /**
-    //  * Tâche exécutée toutes les minutes.
-    //  *
-    //  * @param null $_eqLogic_id Identifiant des objets
-    //  */
-
-
-    // public static function cron($_eqLogic_id = null)
-    // {
-    //   // Récupère la liste des téléphones
-    //   if ($_eqLogic_id == null) {
-    //     $eqLogics = self::byType('phone_detection', true);
-    //   } else {
-    //     $eqLogics = array(self::byId($_eqLogic_id));
-    //   }
-
-    //   // Met à jour l'ensemble des équipements
-    //   foreach($eqLogics as $phone_detectionObj) {
- 	//       $getDataCmd = $phone_detectionObj->getCmd(/*'action'*/ null, 'refresh');
-	//       if(is_object($getDataCmd)) {
-	// 	      log::add('phone_detection', 'debug', $getDataCmd->getId() );
-	// 	      $getDataCmd->execute();
-	//       }
-    //   }
-    // }
-
     /**
      * Call the call Python daemon.
      *
@@ -98,7 +72,6 @@ class phone_detection extends eqLogic
         } catch (\Exception $e) {
             log::add('phone_detection', 'warning', 'Impossible de récupérer la version.');
         }
-        // log::add('phone_detection','info','version:' . $pluginVersion);
         return $pluginVersion;
     }
 
@@ -114,15 +87,6 @@ class phone_detection extends eqLogic
             'log' => 'phone_detection_update',
             'progress_file' => jeedom::getTmpFolder('phone_detection') . '/dependance'
         ];
-
-        // $zigate_version = trim(file_get_contents(dirname(__FILE__) . '/../../resources/zigate_version.txt'));
-        // $cmd = "/usr/bin/python3 -c 'from distutils.version import LooseVersion;import zigate,sys;" .
-        //       "sys.exit(LooseVersion(zigate.__version__)<LooseVersion(\"".$zigate_version."\"))' 2>&1";
-        // exec($cmd, $output, $return_var);
-
-        // if ($return_var == 0) {
-        //     $return['state'] = 'ok';
-        // }
 
         $return['state'] = 'ok';
 
@@ -147,8 +111,6 @@ class phone_detection extends eqLogic
         }
 
         $return['launchable'] = 'ok';
-        // $port = config::byKey('port', 'phone_detection');
-        // $host = config::byKey('host', 'phone_detection');
         $btport = config::byKey('btport', 'phone_detection');
         if (phone_detection::dependancy_info()['state'] == 'nok') {
             $cache = cache::byKey('dependancy' . 'phone_detection');
@@ -163,16 +125,7 @@ class phone_detection extends eqLogic
             $return['launchable_message'] = __('Veuillez sélecter un contrôleur bluetooth', __FILE__);
             return $return;
         }
-        
-        
-        // if (!$host) {
-        //     if (@!file_exists($port) && $port != 'auto') {
-        //         $return['launchable'] = 'nok';
-        //         $return['launchable_message'] = __('Le port n\'est pas configuré ou la zigate n\'est pas connecté.', __FILE__);
-        //     } elseif ($port != 'auto') {
-        //         exec(system::getCmdSudo() . 'chmod 777 ' . $port . ' > /dev/null 2>&1');
-        //     }
-        // }
+
         return $return;
     }
 
@@ -189,20 +142,14 @@ class phone_detection extends eqLogic
         if ($deamon_info['launchable'] != 'ok') {
             throw new Exception(__('Veuillez vérifier la configuration', __FILE__));
         }
-        // $port = config::byKey('port', 'phone_detection');
-        // $host = config::byKey('host', 'phone_detection');
         $btport = config::byKey('btport', 'phone_detection');
         $deamon_path = dirname(__FILE__) . '/../../resources';
-        $interval = config::byKey('interval', 'phone_detection');
+        $interval = config::byKey('interval', 'phone_detection', 10);
+        $present_interval = config::byKey('present_interval', 'phone_detection', 30);
         $absentThreshold = config::byKey('absentThreshold', 'phone_detection');
         $callback = network::getNetworkAccess('internal', 'proto:127.0.0.1:port:comp') . '/plugins/phone_detection/core/php/phone_detection.php';
 
         $cmd = '/usr/bin/python3 ' . $deamon_path . '/phone_detectiond/phone_detectiond.py ';
-        // if ($host) {
-        //     $cmd .= ' --device ' . $host;
-        // } else {
-        //     $cmd .= ' --device ' . $port;
-        // }
         $cmd .= ' --device ' . $btport;
         $cmd .= ' --loglevel ' . log::convertLogLevel(log::getLogLevel('phone_detection'));
         $cmd .= ' --apikey ' . jeedom::getApiKey('phone_detection');
@@ -210,6 +157,7 @@ class phone_detection extends eqLogic
         $cmd .= ' --socket ' . jeedom::getTmpFolder('phone_detection') . '/daemon.sock';
         $cmd .= ' --callback ' . $callback;
         $cmd .= ' --interval ' . $interval;
+        $cmd .= ' --present_interval ' . $present_interval;
         $cmd .= ' --absentThreshold ' . $absentThreshold;
         
         log::add('phone_detection', 'info', 'Lancement démon phone_detection : ' . $cmd);
@@ -361,25 +309,9 @@ class phone_detection extends eqLogic
 
     }
 
-    public static function postSave() {
-      log::add('phone_detection', 'debug', 'postSave()');
-      // log::add('phone_detection', 'debug', 'applyMacAddress:'. $this->getConfiguration('applyMacAddress'));
-      // log::add('phone_detection', 'debug', 'macAddress:' . $this->getConfiguration('macAddress'));
-      // if ($this->getConfiguration('applyMacAddress') !=  $this->getConfiguration('macAddress')) {
-      //   $this->applyModuleConfiguration();
-      // }
-    }
-
     private function applyModuleConfiguration() {
       $this->setConfiguration('applyMacAddress', $this->getConfiguration('macAddress'));
       $this->save();
-
-      // if($this->getConfiguration('device') == '') {
-      //   return true;
-      // }
-
-      // $device = self::devicesParameters($this->getConfiguration('device'));
-
     }
     /********** Getters and setters **********/
 
@@ -403,7 +335,6 @@ class phone_detectionCmd extends cmd
 		$phone_detectionObj = phone_detection::byId($this->getEqlogic_id());
 		log::add('phone_detection', 'debug', 'eqLogic Id:' .$this->getEqLogic_id());
 
-//		$phone_detectionObj = $phone_detectionArray[0];
             // On récupère la commande 'data' appartenant à l'équipement
 	    $dataCmd = $phone_detectionObj->getCmd('info', 'state');
 
