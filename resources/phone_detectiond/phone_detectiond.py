@@ -218,6 +218,22 @@ class JeedomCallback:
             return False
         return True
 
+    def getDevices(self):
+        logging.info('Get devices from Jeedom')
+        devices = self.send_now({'action':'get_devices'})
+        if not devices or not devices.get('success'):
+            logging.error('FAILED')
+            return None
+        # values = json.loads(devices)
+        r = {}
+        for key in devices["value"]:
+            item = devices["value"][key]
+            r[key] = Phone(item["macAddress"], item["id"])
+            r[key].humanName = item['name']
+            r[key].isReachable = item["state"]
+            r[key].lastStateDate = datetime.fromisoformat(item['lastValueDate'])
+        return r      
+
 class JeedomHandler(socketserver.BaseRequestHandler):
     def handle(self):
         # self.request is the TCP socket connected to the client
@@ -347,8 +363,8 @@ def shutdown():
         logging.info("\t==> {}".format(THREADS[key].device.humanName))
         THREADS[key].stop(False)
     
-    logging.info("Stopping devices file hander")
-    devicesFileHanlder.stop(False)
+    # logging.info("Stopping devices file hander")
+    # devicesFileHanlder.stop(False)
 
     logging.info("Shutting down local server")
     server.shutdown()
@@ -421,7 +437,9 @@ server = socketserver.UnixStreamServer(args.socket, JeedomHandler)
 handlerThread = threading.Thread(target=server.serve_forever)
 handlerThread.start()
 
-devicesFileHanlder = DevicesFileHandler(60, DEVICES)
+# devicesFileHanlder = DevicesFileHandler(60, DEVICES)
+
+DEVICES = jc.getDevices()
 
 # Démarrage des threads
 THREADS = {}
