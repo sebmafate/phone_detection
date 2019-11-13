@@ -25,6 +25,8 @@ switch ($action) {
         log::add('phone_detection','debug', 'State property name: '. $stateProperty->getHumanName());
 
         $stateProperty->event($value);
+
+
         $success = true;
         break;
 
@@ -39,6 +41,11 @@ switch ($action) {
         $success = true;
         break;
 
+    case "refresh_group":
+        phone_detection::updateGlobalDevice();
+        $success = true;
+        break;
+
     case "get_devices":
         $devices = eqLogic::byType("phone_detection", true);
         $values = Null;
@@ -46,6 +53,10 @@ switch ($action) {
         // $values["devices"] = $devices;
         
         foreach($devices as $d) {
+            if ($d->getConfiguration('deviceType') != 'phone') {
+                continue;
+            }
+
             $statePropertyCmd = $d->getCmd('info', 'state');
             $stateValue = $statePropertyCmd->execCmd() == 1;
             $getValueDate = $statePropertyCmd->getValueDate();

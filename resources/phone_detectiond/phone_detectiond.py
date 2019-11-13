@@ -214,6 +214,13 @@ class JeedomCallback:
             logging.error('Error during update status')
             return False
         return True
+    
+    def updateGlobalDevice(self):
+        r = sef.__send_now({'action': 'refresh_group'})
+        if not r or not r.get('success'):
+            logging.error('Error during updateGlobalDevice')
+            return False
+        return True
 
     def getDevices(self):
         logging.info('Get devices from Jeedom')
@@ -386,6 +393,8 @@ handlerThread.start()
 
 # Récupération des devices dans Jeedom
 DEVICES = jc.getDevices()
+
+jc.getDevices()
 
 # Démarrage des threads
 THREADS = {}

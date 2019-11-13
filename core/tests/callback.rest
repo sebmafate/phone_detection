@@ -1,4 +1,23 @@
 POST http://jeedom:80/plugins/phone_detection/core/php/phone_detection.php?apikey=PLIlFGKAE1dEadiYt4uwvc1SK0mvNEn2
 Content-Type: application/json
 
-action:'get_devices'
+{
+    "action":"get_devices"
+}
+
+###
+POST http://jeedom:80/plugins/phone_detection/core/php/phone_detection.php?apikey=PLIlFGKAE1dEadiYt4uwvc1SK0mvNEn2
+Content-Type: application/json
+
+{
+    "action":"test"
+}
+
+###
+POST http://jeedom:80/plugins/phone_detection/core/php/phone_detection.php?apikey=PLIlFGKAE1dEadiYt4uwvc1SK0mvNEn2
+Content-Type: application/json
+
+{
+    "action":"get_status",
+    "id":"171"
+}
