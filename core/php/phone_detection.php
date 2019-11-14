@@ -20,13 +20,14 @@ switch ($action) {
         log::add('phone_detection', 'debug', 'value: '.$value);
 
         $eqLogic = eqLogic::byId($id);
-        log::add('phone_detection','debug', 'Device Name: '. $eqLogic->getHumanName());
-        $stateProperty = $eqLogic->getCmd('info', 'state');
-        log::add('phone_detection','debug', 'State property name: '. $stateProperty->getHumanName());
+        if ($eqLogic->getConfiguration('deviceType') == 'phone') {
+            log::add('phone_detection','debug', 'Device Name: '. $eqLogic->getHumanName());
+            $stateProperty = $eqLogic->getCmd('info', 'state');
+            log::add('phone_detection','debug', 'State property name: '. $stateProperty->getHumanName());
 
-        $stateProperty->event($value);
-
-
+            $stateProperty->event($value);
+            phone_detection::updateGlobalDevice();
+        }
         $success = true;
         break;
 

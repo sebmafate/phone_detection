@@ -3,6 +3,7 @@
 
 # Miscellaneous files
 devices.json
+*.rest
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

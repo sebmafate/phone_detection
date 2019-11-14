@@ -209,7 +209,7 @@ class JeedomCallback:
         return r['value'] == 1
 
     def setDeviceStatus(self, deviceId, status):
-        r = self.__send_now({'action': 'update_device_status', 'id' : deviceId, 'value': (0,1)[status]})
+        r = self.__send_now({'action': 'update_device_status', 'id' : deviceId, 'value': (1,0)[status]})
         if not r or not r.get('success'):
             logging.error('Error during update status')
             return False
