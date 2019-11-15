@@ -21,7 +21,7 @@ Dans la fenêtre qui s'ouvre renseignez comme suit les informations :
 Il est aussi possible d'installer en utilisant le code source. Attention, cette manipulation est réservée à un public plutôt averti, vous pouvez en effet rendre votre jeedom instable.
 
 - Dans une console (en ssh ou en local), rendez vous dans le répertoire /var/www/html/plugins
-- Exécutez la commande suivante : `git clone https://github.com/sebmafate/phone_detection/ --branch develop`
+- Exécutez la commande suivante : `sudo git clone https://github.com/sebmafate/phone_detection/ --branch develop`
 - Voilà, c'est installé !
 
 ## 3. Configuration

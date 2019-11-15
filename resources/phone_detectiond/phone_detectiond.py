@@ -224,6 +224,22 @@ class JeedomCallback:
             return False
         return True
 
+    # def getDeviceById(self, deviceId):
+    #     logging.info('Get device by Id')
+    #     result = self.__send_now({'action':'get_device_by_id', 'id':deviceId})
+    #     if not result or not result.get('success'):
+    #         logging.error('FAILED')
+    #         return None
+        
+    #     r = {}
+    #     item = result["value"]
+    #     r = Phone(item["macAddress"], item["id"])
+    #     r.humanName = item["name"]
+    #     r.isReachable = item["state"]
+    #     r.lastStateDate = datetime.fromisoformat(item["lastValueDate"])
+
+    #     return r
+
     def getDevices(self):
         logging.info('Get devices from Jeedom')
         devices = self.__send_now({'action':'get_devices'})
@@ -270,8 +286,8 @@ class JeedomHandler(socketserver.BaseRequestHandler):
                 DEVICES[id].humanName = name
                 DEVICES[id].deviceId = id
                 DEVICES[id].macAddress = macAddress
-                if id in THREADS:
-                    THREADS[id].stop(False)
+                # if id in THREADS:
+                #     THREADS[id].stop(False)
                 response['result'] = 'Update OK'
             else:
                 logging.debug('Add new device in device.json')

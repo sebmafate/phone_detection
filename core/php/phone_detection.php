@@ -47,6 +47,29 @@ switch ($action) {
         $success = true;
         break;
 
+    case "get_device_by_id":
+        $d = eqLogic::byId($id);
+        $statePropertyCmd = $d->getCmd('info', 'state');
+        $stateValue = $statePropertyCmd->execCmd() == 1;
+        $getValueDate = $statePropertyCmd->getValueDate();
+        $name = $d->getName();
+        $humanName = $d->getHumanName();
+        $id = $d->getId();
+        $macAddress = $d->getConfiguration('macAddress');
+        
+        $value = [
+            "state" => $stateValue,
+            "lastValueDate" => $getValueDate,
+            "name" => $name,
+            "humanName" => $humanName,
+            "id" => $id,
+            "macAddress" => $macAddress
+        ];
+
+        $success = true;
+        break;
+
+
     case "get_devices":
         $devices = eqLogic::byType("phone_detection", true);
         $values = Null;
