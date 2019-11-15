@@ -271,7 +271,7 @@ class JeedomHandler(socketserver.BaseRequestHandler):
                 DEVICES[id].deviceId = id
                 DEVICES[id].macAddress = macAddress
                 if id in THREADS:
-                    THREADS[id].stop()
+                    THREADS[id].stop(False)
                 response['result'] = 'Update OK'
             else:
                 logging.debug('Add new device in device.json')
@@ -287,7 +287,7 @@ class JeedomHandler(socketserver.BaseRequestHandler):
             if id in DEVICES:
                 del DEVICES[id]
                 if id in THREADS:
-                    THREADS[id].stop()
+                    THREADS[id].stop(False)
                     del THREADS[id]
                 response['result'] = 'Remove OK'
 
