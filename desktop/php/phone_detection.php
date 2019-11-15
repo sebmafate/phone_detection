@@ -211,14 +211,6 @@ include_file('desktop', 'phone_detection', 'js', 'phone_detection');
 ?>
 
 <script type="text/javascript">
-// $(".eqLogicDisplayCard,.li_eqLogic").on('click', function (event) {
-//   updateFormForDevice(event);
-// });
-
-// $(document).ready(function()) {
-//   updateFromForDevice();
-// }
-
 $('body').delegate('.eqLogicAttr[data-l1key=id]', 'change', function () {
   updateFormForDevice();
 });
@@ -233,9 +225,13 @@ updateFormForDevice = function() {
   if (deviceType[deviceId] == "phone") {
     $("#phone_detection_macAddress").show();
     $(".btn[data-action=remove]").show();
+    $("#bt_eqLogicConfigureRemove").show();
+    $("#bt_eqLogicConfigureSave").removeClass("roundedRight");
   } else {
     $("#phone_detection_macAddress").hide();
     $(".btn[data-action=remove]").hide();
+    $("#bt_eqLogicConfigureRemove").hide();
+    $("#bt_eqLogicConfigureSave").addClass("roundedRight");
   }
 }
 </script>
