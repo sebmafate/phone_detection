@@ -62,7 +62,7 @@ class Phone:
         if self.isReachable and datetime.utcnow() > thresholdDate:
             self.isReachable = False
             self.lastStateDate = datetime.utcnow()
-            logging.info('Set {}\'s phone absent'.format(self.humanName))
+            logging.info('Set "{}" phone absent'.format(self.humanName))
             self.mustUpdate = True
             return True
         
@@ -209,14 +209,16 @@ class JeedomCallback:
         return r['value'] == 1
 
     def setDeviceStatus(self, deviceId, status):
-        r = self.__send_now({'action': 'update_device_status', 'id' : deviceId, 'value': (1,0)[status]})
+        logging.debug('device status: {}'.format(status))
+
+        r = self.__send_now({'action': 'update_device_status', 'id' : deviceId, 'value': (0,1)[status]})
         if not r or not r.get('success'):
             logging.error('Error during update status')
             return False
         return True
     
     def updateGlobalDevice(self):
-        r = sef.__send_now({'action': 'refresh_group'})
+        r = self.__send_now({'action': 'refresh_group'})
         if not r or not r.get('success'):
             logging.error('Error during updateGlobalDevice')
             return False
