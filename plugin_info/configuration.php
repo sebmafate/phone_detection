@@ -52,7 +52,7 @@ function getBTControllers()
     <fieldset>
     <div class="form-group">
       <label class="col-sm-4 control-label">
-        {{ Interval de mise à jour quand le téléphone est absent }} <sup><i class="fa fa-question-circle tooltips" title="{{C'est le temps en secondes entre 2 tentatives de ping du téléphone quand le téléphone est absent}}" style="font-size : 1em;color:grey;"></i></sup>
+        {{ Intervalle de mise à jour quand le téléphone est absent }} <sup><i class="fa fa-question-circle tooltips" title="{{C'est le temps en secondes entre 2 tentatives de ping du téléphone quand le téléphone est absent}}" style="font-size : 1em;color:grey;"></i></sup>
       </label>
       <div class="col-sm-1">
         <input type="text" class="configKey form-control" data-l1key="interval" placeholder="10"/>
@@ -61,7 +61,7 @@ function getBTControllers()
     <fieldset>
     <div class="form-group">
       <label class="col-sm-4 control-label">
-        {{ Interval de mise à jour quand le télépone est présent }} <sup><i class="fa fa-question-circle tooltips" title="{{C'est le temps en secondes entre 2 tentatives de ping du téléphone quand le téléphone est présent}}" style="font-size : 1em;color:grey;"></i></sup>
+        {{ Intervalle de mise à jour quand le téléphone est présent }} <sup><i class="fa fa-question-circle tooltips" title="{{C'est le temps en secondes entre 2 tentatives de ping du téléphone quand le téléphone est présent}}" style="font-size : 1em;color:grey;"></i></sup>
       </label>
       <div class="col-sm-1">
         <input type="text" class="configKey form-control" data-l1key="present_interval" placeholder="30"/>
@@ -70,7 +70,7 @@ function getBTControllers()
     <fieldset>
     <div class="form-group">
       <label class="col-sm-4 control-label">
-        {{ Délai pour considéré le téléphone comme absent }} <sup><i class="fa fa-question-circle tooltips" title="{{C'est le temps en secondes après lequel le téléphone est considérer comme absent}}" style="font-size : 1em;color:grey;"></i></sup>
+        {{ Délai pour considérer le téléphone comme absent }} <sup><i class="fa fa-question-circle tooltips" title="{{C'est le temps en secondes après lequel le téléphone est considéré comme absent}}" style="font-size : 1em;color:grey;"></i></sup>
       </label>
       <div class="col-sm-1">
         <input type="text" class="configKey form-control" data-l1key="absentThreshold" placeholder="180"/>
