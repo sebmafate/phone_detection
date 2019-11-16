@@ -137,9 +137,13 @@ class phone_detection extends eqLogic
                 shell_exec(system::getCmdSudo() . 'rm -rf ' . $pid_file . ' 2>&1 > /dev/null');
             }
         }
-
         $return['launchable'] = 'ok';
+        
         $btport = config::byKey('btport', 'phone_detection');
+        $interval = config::byKey('interval', 'phone_detection', 10);
+        $present_interval = config::byKey('present_interval', 'phone_detection', 30);
+        $absentThreshold = config::byKey('absentThreshold', 'phone_detection', 180);
+
         if (phone_detection::dependancy_info()['state'] == 'nok') {
             $cache = cache::byKey('dependancy' . 'phone_detection');
             $cache->remove();
@@ -148,10 +152,25 @@ class phone_detection extends eqLogic
             return $return;
         } 
 
-        if ($btport == "none" || $btport == "") {
+        if ($btport == "none" || $btport == "" || empty($btport)) {
             $return['launchable'] = 'nok';
-            $return['launchable_message'] = __('Veuillez sélecter un contrôleur bluetooth', __FILE__);
+            $return['launchable_message'] = __('Veuillez sélectionner un contrôleur bluetooth', __FILE__);
             return $return;
+        }
+
+        if($interval == 0 || empty($interval)) {
+            $return['launchable'] = 'nok';
+            $return['launchable_message'] = _('Veuillez reseigner un interval de mise à jour en absence supérieur à 0', __FILE__);
+        }
+
+        if($present_interval == 0 || empty($present_interval)) {
+            $return['launchable'] = 'nok';
+            $return['launchable_message'] = _('Veuillez reseigner un interval de mise à jour en présence supérieur à 0', __FILE__);
+        }
+
+        if($absentThreshold == 0 || empty($absentThreshold)) {
+            $return['launchable'] = 'nok';
+            $return['launchable_message'] = _('Veuillez reseigner un délai d\'absence supérieur à 0', __FILE__);
         }
 
         return $return;
@@ -174,7 +193,7 @@ class phone_detection extends eqLogic
         $deamon_path = dirname(__FILE__) . '/../../resources';
         $interval = config::byKey('interval', 'phone_detection', 10);
         $present_interval = config::byKey('present_interval', 'phone_detection', 30);
-        $absentThreshold = config::byKey('absentThreshold', 'phone_detection');
+        $absentThreshold = config::byKey('absentThreshold', 'phone_detection', 180);
         $callback = network::getNetworkAccess('internal', 'proto:127.0.0.1:port:comp') . '/plugins/phone_detection/core/php/phone_detection.php';
 
         $cmd = '/usr/bin/python3 ' . $deamon_path . '/phone_detectiond/phone_detectiond.py ';

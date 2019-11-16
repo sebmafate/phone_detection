@@ -266,21 +266,20 @@ class JeedomHandler(socketserver.BaseRequestHandler):
             macAddress = args[2]
 
             if id in DEVICES:
+                # update
                 logging.debug('Update device in device.json')
                 DEVICES[id].humanName = name
                 DEVICES[id].deviceId = id
                 DEVICES[id].macAddress = macAddress
-                if id in THREADS:
-                    THREADS[id].stop(False)
                 response['result'] = 'Update OK'
             else:
+                # insert
                 logging.debug('Add new device in device.json')
                 DEVICES[id] = Phone(macAddress, id)
                 DEVICES[id].humanName = name
                 THREADS[id] = PhoneDetection(DEVICES[id], BTCONTROLLER, INTERVAL, PRESENTINTERVAL, jc)
                 response['result'] = 'Insert OK'
-
-            THREADS[id].start()
+                THREADS[id].start()
         
         if action == 'remove_device':
             id = args[0]
@@ -396,7 +395,7 @@ handlerThread.start()
 # Récupération des devices dans Jeedom
 DEVICES = jc.getDevices()
 
-jc.getDevices()
+jc.updateGlobalDevice()
 
 # Démarrage des threads
 THREADS = {}
