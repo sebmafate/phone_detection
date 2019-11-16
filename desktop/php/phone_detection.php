@@ -222,7 +222,7 @@ updateFormForDevice = function() {
 
   // alert(deviceId + "\n" + deviceType[deviceId])
 
-  if (deviceType[deviceId] == "phone") {
+  if (deviceType[deviceId] != "GlobalGroup") {
     $("#phone_detection_macAddress").show();
     $(".btn[data-action=remove]").show();
     $("#bt_eqLogicConfigureRemove").show();
