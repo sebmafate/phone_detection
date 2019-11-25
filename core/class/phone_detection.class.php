@@ -371,7 +371,7 @@ class phone_detection extends eqLogic
             }
         }
 
-        if (deviceType == 'GlobalGroup') {
+        if ($deviceType == 'GlobalGroup') {
             $getRefreshCmd = $this->getCmd(null, 'refresh');
             if (is_object($getRefreshCmd)) {
                 $getRefreshCmd->remove();
