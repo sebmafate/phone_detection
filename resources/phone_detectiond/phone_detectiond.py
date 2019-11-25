@@ -29,6 +29,7 @@ BASE_PATH = os.path.abspath(BASE_PATH)
 PLUGIN_NAME = "phone_detection"
 DEVICES = {}
 THREADS = {}
+DATEFORMAT = '%Y-%m-%d %H:%M:%S'
 
 """
 Classe permettant de regrouper les informations d'un téléphone
@@ -237,7 +238,8 @@ class JeedomCallback:
             r[key] = Phone(item["macAddress"], item["id"])
             r[key].humanName = item['name']
             r[key].isReachable = item["state"]
-            r[key].lastStateDate = datetime.fromisoformat(item['lastValueDate'])
+            #r[key].lastStateDate = datetime.fromisoformat(item['lastValueDate'])
+            r[key].lastStateDate = datetime.strptime(item['lastValueDate'], DATEFORMAT)
         return r      
 
 """
