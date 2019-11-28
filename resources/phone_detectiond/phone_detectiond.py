@@ -238,8 +238,11 @@ class JeedomCallback:
             r[key] = Phone(item["macAddress"], item["id"])
             r[key].humanName = item['name']
             r[key].isReachable = item["state"]
-            #r[key].lastStateDate = datetime.fromisoformat(item['lastValueDate'])
-            r[key].lastStateDate = datetime.strptime(item['lastValueDate'], DATEFORMAT)
+            try:
+                #r[key].lastStateDate = datetime.fromisoformat(item['lastValueDate'])
+                r[key].lastStateDate = datetime.strptime(item['lastValueDate'], DATEFORMAT)
+            except:
+                r[key].lastStateDate = datetime.utcnow()
         return r      
 
 """

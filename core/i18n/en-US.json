@@ -1,0 +1,43 @@
+{
+    "plugins/phone_detection/desktop/js/phone_detection.js" : {
+        "Historiser" : "Historize",
+        "Tester" : "Test"
+    },
+    "plugins/phone_detection/desktop/phone_detection.php" : {
+        "Ajouter un objet" : "Add a device",
+        "Rechercher" : "Search",
+        "Gestion" : "Management",
+        "Ajouter" : "Add",
+        "Configuration" : "Configuration",
+        "Mes objects" : "My devices",
+        "Sauvegarder" : "Save",
+        "Supprimer" : "Delete",
+        "Configuration avancée" : "Advanced settings",
+        "Equipement" : "Device",
+        "Commandes":"Commands",
+        "Nom de l'équipement" : "Device name",
+        "Objet parent": "Parent object",
+        "Aucun" : "None",
+        "Etat":"State",
+        "Activer" : "Enable",
+        "Visible" : "Visible",
+        "Adresse MAC" : "MAC Address",
+        "Nom":"Name",
+        "Historique" : "Historize",
+        "Actions":"Actions"
+    },
+    "plugins/phone_detection/plugin_info/installation.php" : {
+        "Mise à jour du plugin Phone_detection terminée, vous êtes en version" : "Update of the Phone_detection plugin completed, you are running version"
+    },
+    "plugins/phone_detection/plugin_info/configuration.php" : {
+        "Version plugin" : "Plugin version",
+        "Contrôleur Bluetooth" : "Bluetooth controler",
+        "Aucun":"None",
+        "C'est la version du plugin Phone_Detection" : "It's the Phone_detection plugin version",
+        "Intervalle de mise à jour quand le téléphone est absent" : "Update interval when the phone is absent",
+        "C'est le temps en secondes entre 2 tentatives de ping du téléphone quand le téléphone est absent" : "It is the time in seconds between 2 attempts to ping the phone when the phone is absent",
+        "Intervalle de mise à jour quand le téléphone est présent" : "Update interval when the phone is present",
+        "C'est le temps en secondes entre 2 tentatives de ping du téléphone quand le téléphone est présent" : "It is the time in seconds between 2 attempts to ping the phone when the phone is present",
+        "Délai pour considérer le téléphone comme absent" : "Time limit for considering the phone as absent",
+        "C'est le temps en secondes après lequel le téléphone est considéré comme absent": "This is the time in seconds after which the phone is considered absent"
+    }
