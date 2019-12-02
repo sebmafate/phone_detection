@@ -8,10 +8,10 @@ Il permet de détecter la présent d'un ou plusieurs téléphone en utilisant l'
 ## 2. Installation
 Pour le moment, ce plugin n'est pas configuré dans le market Jeedom, j'attends qu'il soit stable avant de le publier. L'installation doit donc se faire manuellement.
 
-### a. Installation via jeedom
-Jeedom permet d'installer facilement un plugin en passant par le market en fournissant l'url du projet Github.
+### a. Installation via jeedom market
+Jeedom permet d'installer facilement un plugin :
 
-Pour cela dans le gestionnaire de plugins cliquez sur le boutont "+ Plugins"
+Pour cela dans le gestionnaire de plugins cliquez sur le bouton "Market"
 ![Add plugins](images/add_plugin.png)
 
 Dans la fenêtre qui s'ouvre renseignez comme suit les informations :
