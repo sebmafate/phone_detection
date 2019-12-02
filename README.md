@@ -15,7 +15,7 @@ Pour cela dans le gestionnaire de plugins cliquez sur le bouton "Market"
 ![Add plugins](images/add_plugin.png)
 
 Dans la fenêtre qui s'ouvre renseignez comme suit les informations :
-![](images/add_plugin_github.png)
+![](images/add_plugin_github.jpg)
 
 ### b. Installation via le code source
 Il est aussi possible d'installer en utilisant le code source. Attention, cette manipulation est réservée à un public plutôt averti, vous pouvez en effet rendre votre jeedom instable.
