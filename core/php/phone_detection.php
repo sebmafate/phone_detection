@@ -8,34 +8,44 @@ if (!jeedom::apiAccess(init('apikey'), 'phone_detection')) {
 }
 
 $results = json_decode(file_get_contents("php://input"), true);
-// $response = array('success' => false);
 $action = $results['action'];
 $value = 0;
 
-$id = $results['id'];
-log::add('phone_detection', 'debug', 'id: '.$id);
 switch ($action) {
     case "update_device_status":
+        $id = $results['id'];
+        log::add('phone_detection', 'debug', 'id: '.$id);
         $value = $results['value'];
         log::add('phone_detection', 'debug', 'value: '.$value);
 
         $eqLogic = eqLogic::byId($id);
-        log::add('phone_detection','debug', 'Device Name: '. $eqLogic->getHumanName());
-        $stateProperty = $eqLogic->getCmd('info', 'state');
-        log::add('phone_detection','debug', 'State property name: '. $stateProperty->getHumanName());
+        if ($eqLogic->getConfiguration('deviceType') == 'phone') {
+            log::add('phone_detection','debug', 'Device Name: '. $eqLogic->getHumanName());
+            $stateProperty = $eqLogic->getCmd('info', 'state');
+            log::add('phone_detection','debug', 'State property name: '. $stateProperty->getHumanName());
 
-        $stateProperty->event($value);
+            $stateProperty->event($value);
+            phone_detection::updateGlobalDevice();
+        }
         $success = true;
         break;
 
     case "test":
         $success = true;
+        $value = 0;
         break;
 
     case "get_status":
+        $id = $results['id'];
+        log::add('phone_detection', 'debug', 'id: '.$id);
         $eqLogic = eqLogic::byId($id);
         $statePropertyCmd = $eqLogic->getCmd('info', 'state');
         $value = $statePropertyCmd->execCmd();
+        $success = true;
+        break;
+
+    case "refresh_group":
+        phone_detection::updateGlobalDevice();
         $success = true;
         break;
 
@@ -46,6 +56,10 @@ switch ($action) {
         // $values["devices"] = $devices;
         
         foreach($devices as $d) {
+            if ($d->getConfiguration('deviceType') != 'phone') {
+                continue;
+            }
+
             $statePropertyCmd = $d->getCmd('info', 'state');
             $stateValue = $statePropertyCmd->execCmd() == 1;
             $getValueDate = $statePropertyCmd->getValueDate();
@@ -55,7 +69,7 @@ switch ($action) {
             $macAddress = $d->getConfiguration('macAddress');
             
             $values[$id] = [
-                "state" => $stateValue,
+                "state" => $stateValue, 
                 "lastValueDate" => $getValueDate,
                 "name" => $name,
                 "humanName" => $humanName,

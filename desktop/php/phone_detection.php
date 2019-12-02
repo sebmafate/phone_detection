@@ -13,6 +13,13 @@ sendVarToJS('eqType', $plugin->getId());
 // Accéder aux données du plugin
 $eqLogics = eqLogic::byType($plugin->getId());
 ?>
+
+<script type="text/javascript">
+var deviceType = new Object();
+<?php foreach($eqLogics as $eqLogic): ?>
+  deviceType["<?php echo $eqLogic->getId(); ?>"] = "<?php echo $eqLogic->getConfiguration("deviceType"); ?>";
+<?php endforeach; ?>
+</script>
   <!-- Container global (Ligne bootstrap) -->
   <div class="row row-overflow">
     <!-- Container bootstrap du menu latéral -->
@@ -68,7 +75,17 @@ $eqLogics = eqLogic::byType($plugin->getId());
           <?php foreach ($eqLogics as $eqLogic): ?>
             <div class="eqLogicDisplayCard cursor" data-eqLogic_id="<?php echo $eqLogic->getId(); ?>"
                  style="position: absolute; left: 0px; top: 0px;">
-	      <i class="fa fa-mobile" style="font-size : 6em;color:white; margin: 0 auto; padding: 12pt 8pt; background-color:deepskyblue; width:75px !important;height:75px !important; border-radius:16px;"></i>
+
+            <?php if ($eqLogic->getConfiguration('deviceType') == 'phone'): ?>
+            <span style="color:white; margin: 0 auto; background-color:deepskyblue; width:75px !important;height:75px !important; border-radius:16px;">
+              <img src="/plugins/phone_detection/desktop/images/white_single_phone.png" style="height:60px !important; width: auto !important; padding-top:15px !important;max-height:auto !important;min-height:auto !important;" />
+            </span>
+            <?php else: ?>
+            <span style="color:white; margin: 0 auto; background-color:red; width:75px !important;height:75px !important; border-radius:16px;">
+              <img src="/plugins/phone_detection/desktop/images/white_phone_group.png" style="height:60px !important; width: auto !important; padding-top:15px !important;max-height:auto !important;min-height:auto !important;" />
+            </span>
+            <?php endif ?>
+	      <!-- <i class="fa fa-mobile" style="font-size : 6em;color:white; margin: 0 auto; padding: 12pt 8pt; background-color:deepskyblue; width:75px !important;height:75px !important; border-radius:16px;"></i> -->
 	      <span class="name phone" style="display:inline-block">
 			<?php echo $eqLogic->getHumanName(true, true); ?>
 	      </span>
@@ -97,7 +114,7 @@ $eqLogics = eqLogic::byType($plugin->getId());
         <!-- Onglet "Equipement" -->
         <li role="presentation" class="active"><a href="#eqlogictab" aria-controls="home" role="tab"
                                                   data-toggle="tab"><i
-                class="fa fa-tachometer"></i> {{Equipement}}</a></li>
+                class="fa fa-mobile"></i> {{Equipement}}</a></li>
         <!-- Onglet "Commandes" -->
         <li role="presentation"><a href="#commandtab" aria-controls="profile" role="tab" data-toggle="tab"><i
                 class="fa fa-list-alt"></i> {{Commandes}}</a></li>
@@ -150,7 +167,7 @@ foreach (jeeObject::all() as $object) {
                       <label class="checkbox-inline"><input type="checkbox" class="eqLogicAttr" data-l1key="isVisible" checked/>{{Visible}}</label>
                     </div>
                   </div>
-                  <div class="form-group">
+                  <div class="form-group" id='phone_detection_macAddress'>
                     <!-- Label du champ -->
                     <label class="col-sm-6 control-label">{{Adresse MAC}}</label>
                     <!-- Container du champ -->
@@ -191,3 +208,30 @@ foreach (jeeObject::all() as $object) {
 include_file('core', 'plugin.template', 'js');
 // Inclure le fichier javascript du phone_detection
 include_file('desktop', 'phone_detection', 'js', 'phone_detection');
+?>
+
+<script type="text/javascript">
+$('body').delegate('.eqLogicAttr[data-l1key=id]', 'change', function () {
+  updateFormForDevice();
+});
+
+
+updateFormForDevice = function() {
+  var deviceId = $('.eqLogicAttr[data-l1key=id]').value();
+  deviceId = deviceId + "";
+
+  // alert(deviceId + "\n" + deviceType[deviceId])
+
+  if (deviceType[deviceId] != "GlobalGroup") {
+    $("#phone_detection_macAddress").show();
+    $(".btn[data-action=remove]").show();
+    $("#bt_eqLogicConfigureRemove").show();
+    $("#bt_eqLogicConfigureSave").removeClass("roundedRight");
+  } else {
+    $("#phone_detection_macAddress").hide();
+    $(".btn[data-action=remove]").hide();
+    $("#bt_eqLogicConfigureRemove").hide();
+    $("#bt_eqLogicConfigureSave").addClass("roundedRight");
+  }
+}
+</script>

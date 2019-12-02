@@ -21,7 +21,7 @@ echo 70 > ${PROGRESS_FILE}
 sudo apt-get install -y python3-dev
 echo 80 > ${PROGRESS_FILE}
 BASEDIR=$(dirname "$0")
-sudo apt-get install -y bluez-utils 
+sudo apt-get install -y bluez
 echo 100 > ${PROGRESS_FILE}
 sudo usermod -aG bluetooth www-data
 echo "Installation des dépendances terminé !"

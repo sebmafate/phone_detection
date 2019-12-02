@@ -50,6 +50,34 @@ class phone_detection extends eqLogic
         return $result;
     }
 
+    public static function updateGlobalDevice() {
+        log::add('phone_detection', 'info', 'updateGlobalDevice()');
+
+        $devices = eqLogic::byType("phone_detection", true);
+        $deviceCount = 0;
+        // $values["count"] = count($devices);
+        // $values["devices"] = $devices;
+        
+        foreach($devices as $d) {
+            if ($d->getConfiguration('deviceType') != 'phone') {
+                continue;
+            }
+
+            $statePropertyCmd = $d->getCmd('info', 'state');
+            $stateValue = $statePropertyCmd->execCmd();
+            $deviceCount += $stateValue;
+        }
+
+        $globalDevice = self::byLogicalId('GlobalGroup', 'phone_detection');
+        $stateCmd = $globalDevice->getCmd('info', 'state');
+        $stateCmd->event($deviceCount > 0 ? 1 : 0);
+        $stateCmd->save();
+
+        $deviceCountCmd = $globalDevice->getCmd('info', 'count');
+        $deviceCountCmd->event($deviceCount);
+        $deviceCountCmd->save();
+    }
+
 
     /**************** Methods ****************/
     /**
@@ -109,9 +137,13 @@ class phone_detection extends eqLogic
                 shell_exec(system::getCmdSudo() . 'rm -rf ' . $pid_file . ' 2>&1 > /dev/null');
             }
         }
-
         $return['launchable'] = 'ok';
+        
         $btport = config::byKey('btport', 'phone_detection');
+        $interval = config::byKey('interval', 'phone_detection', 10);
+        $present_interval = config::byKey('present_interval', 'phone_detection', 30);
+        $absentThreshold = config::byKey('absentThreshold', 'phone_detection', 180);
+
         if (phone_detection::dependancy_info()['state'] == 'nok') {
             $cache = cache::byKey('dependancy' . 'phone_detection');
             $cache->remove();
@@ -120,10 +152,25 @@ class phone_detection extends eqLogic
             return $return;
         } 
 
-        if ($btport == "none" || $btport == "") {
+        if ($btport == "none" || $btport == "" || empty($btport)) {
             $return['launchable'] = 'nok';
-            $return['launchable_message'] = __('Veuillez sélecter un contrôleur bluetooth', __FILE__);
+            $return['launchable_message'] = __('Veuillez sélectionner un contrôleur bluetooth', __FILE__);
             return $return;
+        }
+
+        if($interval == 0 || empty($interval)) {
+            $return['launchable'] = 'nok';
+            $return['launchable_message'] = _('Veuillez reseigner un interval de mise à jour en absence supérieur à 0', __FILE__);
+        }
+
+        if($present_interval == 0 || empty($present_interval)) {
+            $return['launchable'] = 'nok';
+            $return['launchable_message'] = _('Veuillez reseigner un interval de mise à jour en présence supérieur à 0', __FILE__);
+        }
+
+        if($absentThreshold == 0 || empty($absentThreshold)) {
+            $return['launchable'] = 'nok';
+            $return['launchable_message'] = _('Veuillez reseigner un délai d\'absence supérieur à 0', __FILE__);
         }
 
         return $return;
@@ -146,7 +193,7 @@ class phone_detection extends eqLogic
         $deamon_path = dirname(__FILE__) . '/../../resources';
         $interval = config::byKey('interval', 'phone_detection', 10);
         $present_interval = config::byKey('present_interval', 'phone_detection', 30);
-        $absentThreshold = config::byKey('absentThreshold', 'phone_detection');
+        $absentThreshold = config::byKey('absentThreshold', 'phone_detection', 180);
         $callback = network::getNetworkAccess('internal', 'proto:127.0.0.1:port:comp') . '/plugins/phone_detection/core/php/phone_detection.php';
 
         $cmd = '/usr/bin/python3 ' . $deamon_path . '/phone_detectiond/phone_detectiond.py ';
@@ -227,86 +274,214 @@ class phone_detection extends eqLogic
     }
 
     public function postInsert() {
-        phone_detection::callDeamon('insert_device',
-            [
-                $this->getId(),
-                $this->getName(),
-                $this->getConfiguration('macAddress')
-            ]
-        );
-    }
-
-    public function preRemove() {
-        phone_detection::callDeamon('remove_device', 
-            [
-                $this->getId(),
-                $this->getName(),
-                $this->getConfiguration('macAddress')
-            ]
-        );
-    }
-
-    public function postUpdate()
-    {
-        log::add('phone_detection', 'debug', 'postUpdate()');
-
-        $getDataCmd = $this->getCmd(null, 'state');
-        if (!is_object($getDataCmd)) {
-            // Création de la commande
-            $cmd = new phone_detectionCmd();
-            // Nom affiché
-            $cmd->setName('Etat');
-            // Identifiant de la commande
-            $cmd->setLogicalId('state');
-            // Identifiant de l'équipement
-            $cmd->setEqLogic_id($this->getId());
-            // Type de la commande
-            $cmd->setType('info');
-            // Sous-type de la commande
-            $cmd->setSubType('binary');
-            // Visibilité de la commande
-            $cmd->setIsVisible(1);
-            // Sauvegarde de la commande
-            $cmd->save();
-        }
-        $getDataCmd = $this->getCmd(null, 'refresh');
-        if (!is_object($getDataCmd)) {
-            // Création de la commande
-            $cmd = new phone_detectionCmd();
-            // Nom affiché
-            $cmd->setName('Rafraichir');
-            // Identifiant de la commande
-            $cmd->setLogicalId('refresh');
-            // Identifiant de l'équipement
-            $cmd->setEqLogic_id($this->getId());
-            // Type de la commande
-            $cmd->setType('action');
-            // Sous-type de la commande
-            $cmd->setSubType('other');
-            // Visibilité de la commande
-            $cmd->setIsVisible(1);
-            // Sauvegarde de la commande
-            $cmd->save();
-        }
-
-        if ($this->getIsEnable()) {
-            phone_detection::callDeamon('update_device', 
+        log::add('phone_detection', 'debug', 'postInsert()');
+        if( $this->getConfiguration('deviceType') == 'phone') {
+            phone_detection::callDeamon('insert_device',
                 [
                     $this->getId(),
                     $this->getName(),
                     $this->getConfiguration('macAddress')
                 ]
             );
-        } else {
+        }
+    }
+
+    public function preRemove() {
+        log::add('phone_detection', 'debug', 'preRemove()');
+        if( $this->getConfiguration('deviceType') == 'phone') {
             phone_detection::callDeamon('remove_device', 
-            [
-                $this->getId(),
-                $this->getName(),
-                $this->getConfiguration('macAddress')
-            ]
-        );
+                [
+                    $this->getId(),
+                    $this->getName(),
+                    $this->getConfiguration('macAddress')
+                ]
+            );
+        }
+    }
+
+    public function postUpdate()
+    {
+        log::add('phone_detection', 'debug', 'postUpdate()');
+
+        if (empty($this->getConfiguration('deviceType'))) {
+            log::add('phone_detection', 'info', 'deviceType must be set to phone');
+            $this->setConfiguration('deviceType', 'phone');
+            $this->save();
         }
 
+        $deviceType = $this->getConfiguration('deviceType');
+
+        if ($deviceType == 'phone') {
+
+            $getDataCmd = $this->getCmd(null, 'state');
+            if (!is_object($getDataCmd)) {
+                // Création de la commande
+                $cmd = new phone_detectionCmd();
+                // Nom affiché
+                $cmd->setName('Etat');
+                // Identifiant de la commande
+                $cmd->setLogicalId('state');
+                // Identifiant de l'équipement
+                $cmd->setEqLogic_id($this->getId());
+                // Type de la commande
+                $cmd->setType('info');
+                // Sous-type de la commande
+                $cmd->setSubType('binary');
+                // Visibilité de la commande
+                $cmd->setIsVisible(1);
+                // Sauvegarde de la commande
+                $cmd->save();
+            }
+            $getDataCmd = $this->getCmd(null, 'refresh');
+            if (!is_object($getDataCmd)) {
+                // Création de la commande
+                $cmd = new phone_detectionCmd();
+                // Nom affiché
+                $cmd->setName('Rafraichir');
+                // Identifiant de la commande
+                $cmd->setLogicalId('refresh');
+                // Identifiant de l'équipement
+                $cmd->setEqLogic_id($this->getId());
+                // Type de la commande
+                $cmd->setType('action');
+                // Sous-type de la commande
+                $cmd->setSubType('other');
+                // Visibilité de la commande
+                $cmd->setIsVisible(1);
+                // Sauvegarde de la commande
+                $cmd->save();
+            }
+
+            if ($this->getIsEnable()) {
+                phone_detection::callDeamon('update_device', 
+                    [
+                        $this->getId(),
+                        $this->getName(),
+                        $this->getConfiguration('macAddress')
+                    ]
+                );
+            } else {
+                phone_detection::callDeamon('remove_device', 
+                [
+                    $this->getId(),
+                    $this->getName(),
+                    $this->getConfiguration('macAddress')
+                ]
+            );
+            }
+        }
+
+        if ($deviceType == 'GlobalGroup') {
+            $getRefreshCmd = $this->getCmd(null, 'refresh');
+            if (is_object($getRefreshCmd)) {
+                $getRefreshCmd->remove();
+            }
+        }
+
+        self::createGlobalGroup();
+    }
+
+    private static function createGlobalGroup() {
+        // $test = self::all();
+        // // log::add('phone_detection', 'debug', get_class($test));
+        // foreach($test as $t) {
+        //     log::add('phone_detection', 'debug', '-----------------');
+        //     // log::add('phone_detection', 'debug', /*$t.getName() . '\t' .*/ $t.getId()); // . '\t' . $t.getEqType_name());
+        //     log::add('phone_detection', 'debug', get_class($t) . '\t' . $t->getName() . ' [' . $t->getId() . '] ' . $t->getEqType_name());
+        // }
+
+        // $t = self::byLogicalId('GlobalGroup', 'phone_detection');
+        // log::add('phone_detection', 'debug', get_class($t) . '\t' . $t->getName() . ' [' . $t->getId() . '] ' . $t->getEqType_name());
+
+
+        // // log::add('phone_detection','debug', print_r($test));
+        // return;
+
+        if (is_object(self::byLogicalId('GlobalGroup', 'phone_detection'))) {
+            return;
+        }
+
+        try {
+            log::add('phone_detection', 'debug', 'create Global Group device');
+
+            $group = new self();
+            $group->setLogicalId('GlobalGroup');
+
+            log::add('phone_detection', 'debug', '\t--> set Name');
+            $group->setName('Tous les téléphones');
+
+            log::add('phone_detection', 'debug', '\t--> set eqTypeName');
+            $group->setEqType_name('phone_detection');
+
+            log::add('phone_detection', 'debug', '\t--> set deviceType');
+            $group->setConfiguration('deviceType', 'GlobalGroup');
+
+            log::add('phone_detection', 'debug', '\t--> set visible = 0');
+            $group->setIsVisible(0);
+
+            log::add('phone_detection', 'debug', '\t--> set enable = 1');
+            $group->setIsEnable(1);
+
+            log::add('phone_detection', 'debug', '\t--> set category ');
+            $group->setConfiguration('category', 'group');
+
+            log::add('phone_detection', 'debug', '\t--> set group id');
+            $group->setConfiguration('id', 0);
+
+            $group->save();
+            $group = self::byLogicalId('GlobalGroup', 'phone_detection');
+
+            $getDataCmd = $group->getCmd(null, 'state');
+            if (!is_object($getDataCmd)) {
+                // Création de la commande
+                $cmd = new phone_detectionCmd();
+                // Nom affiché
+                $cmd->setName('Etat');
+                // Identifiant de la commande
+                $cmd->setLogicalId('state');
+                // Identifiant de l'équipement
+                $cmd->setEqLogic_id($group->getId());
+                // Type de la commande
+                $cmd->setType('info');
+                // Sous-type de la commande
+                $cmd->setSubType('binary');
+                // Visibilité de la commande
+                $cmd->setIsVisible(1);
+                // Sauvegarde de la commande
+                $cmd->save();
+            }
+
+            $getDataCmd = $group->getCmd(null, 'count');
+            if (!is_object($getDataCmd)) {
+                // Création de la commande
+                $cmd = new phone_detectionCmd();
+                // Nom affiché
+                $cmd->setName('Nombre de téléphones présents');
+                // Identifiant de la commande
+                $cmd->setLogicalId('count');
+                // Identifiant de l'équipement
+                $cmd->setEqLogic_id($group->getId());
+                // Type de la commande
+                $cmd->setType('info');
+                // Sous-type de la commande
+                $cmd->setSubType('numeric');
+                // Visibilité de la commande
+                $cmd->setIsVisible(1);
+                // Sauvegarde de la commande
+                $cmd->save();
+            }
+
+            $getRefreshCmd = $group->getCmd(null, 'refresh');
+            if (is_object($getRefreshCmd)) {
+                $getRefreshCmd->remove();
+                $group->save();
+            }
+
+        } catch( Exception $ex) {
+            log::add('phone_detection', 'debug', print_r($ex));
+        }
+
+        // $group->save();
     }
 
     private function applyModuleConfiguration() {
@@ -330,38 +505,41 @@ class phone_detectionCmd extends cmd
         log::add('phone_detection', 'debug', 'cmdId:' . $this->getLogicalId());
 
         // Test pour ne répondre qu'à la commande rafraichir
-        if ($this->getLogicalId() == 'refresh') {
+        if ($this->getLogicalId() == 'refresh' /*&& $this->getConfiguration('deviceType') == 'phone'*/) {
             // On récupère l'équipement à partir de l'identifiant fournit par la commande
-		$phone_detectionObj = phone_detection::byId($this->getEqlogic_id());
-		log::add('phone_detection', 'debug', 'eqLogic Id:' .$this->getEqLogic_id());
+            $phone_detectionObj = phone_detection::byId($this->getEqlogic_id());
+            log::add('phone_detection', 'debug', 'eqLogic Id:' . $this->getEqLogic_id());
 
-            // On récupère la commande 'data' appartenant à l'équipement
-	    $dataCmd = $phone_detectionObj->getCmd('info', 'state');
+            if ($phone_detectionObj->getConfiguration('deviceType') == 'phone') {
 
-	    // On récupère la mac address de l'équipement
-		$macAddress = $phone_detectionObj->getConfiguration('macAddress');
-    		log::add('phone_detection','debug', 'mac address: '.$macAddress);
-	
-        // On ping le device pour savoir s'il est là
-        $btController = config::byKey('btport', 'phone_detection');
+                // On récupère la commande 'data' appartenant à l'équipement
+                $dataCmd = $phone_detectionObj->getCmd('info', 'state');
 
-        // $btController = $phone_detectionObj->getConfiguration('btport');
-        log::add('phone_detection','info', 'BT Device: '.$btController);
+                // On récupère la mac address de l'équipement
+                $macAddress = $phone_detectionObj->getConfiguration('macAddress');
+                    log::add('phone_detection','debug', 'mac address: '.$macAddress);
+            
+                // On ping le device pour savoir s'il est là
+                $btController = config::byKey('btport', 'phone_detection');
 
-        $btController = ( $btController == '' ? 'hci0' : $btController );
-        
-	    $name = shell_exec("sudo hcitool -i ". $btController ." name $macAddress");
-	    log::add('phone_detection', 'debug', 'device name:'.$x);
+                // $btController = $phone_detectionObj->getConfiguration('btport');
+                log::add('phone_detection','info', 'BT Device: '.$btController);
 
-	    $state = (empty($name) ? 0 : 1);
+                $btController = ( $btController == '' ? 'hci0' : $btController );
+                
+                $name = shell_exec("sudo hcitool -i ". $btController ." name " . $macAddress);
+                log::add('phone_detection', 'debug', 'device name: '. $name);
 
-            // On lui ajoute un évènement avec pour information 'Données de test'
-        $dataCmd->event($state);
-        // On sauvegarde cet évènement
-	    $dataCmd->save();
+                $state = (empty($name) ? 0 : 1);
+                log::add('phone_detection', 'debug', 'device state: '. $state);
 
-
+                // On lui ajoute un évènement avec pour information 'Données de test'
+                //$dataCmd->event($state);
+                // On sauvegarde cet évènement
+                // $dataCmd->save();
+            }
         }
+        phone_detection::updateGlobalDevice();
     }
 
     /********** Getters and setters **********/

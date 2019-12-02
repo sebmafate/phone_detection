@@ -29,6 +29,7 @@ BASE_PATH = os.path.abspath(BASE_PATH)
 PLUGIN_NAME = "phone_detection"
 DEVICES = {}
 THREADS = {}
+DATEFORMAT = '%Y-%m-%d %H:%M:%S'
 
 """
 Classe permettant de regrouper les informations d'un téléphone
@@ -62,7 +63,7 @@ class Phone:
         if self.isReachable and datetime.utcnow() > thresholdDate:
             self.isReachable = False
             self.lastStateDate = datetime.utcnow()
-            logging.info('Set {}\'s phone absent'.format(self.humanName))
+            logging.info('Set "{}" phone absent'.format(self.humanName))
             self.mustUpdate = True
             return True
         
@@ -209,9 +210,18 @@ class JeedomCallback:
         return r['value'] == 1
 
     def setDeviceStatus(self, deviceId, status):
+        logging.debug('device status: {}'.format(status))
+
         r = self.__send_now({'action': 'update_device_status', 'id' : deviceId, 'value': (0,1)[status]})
         if not r or not r.get('success'):
             logging.error('Error during update status')
+            return False
+        return True
+    
+    def updateGlobalDevice(self):
+        r = self.__send_now({'action': 'refresh_group'})
+        if not r or not r.get('success'):
+            logging.error('Error during updateGlobalDevice')
             return False
         return True
 
@@ -228,7 +238,11 @@ class JeedomCallback:
             r[key] = Phone(item["macAddress"], item["id"])
             r[key].humanName = item['name']
             r[key].isReachable = item["state"]
-            r[key].lastStateDate = datetime.fromisoformat(item['lastValueDate'])
+            try:
+                #r[key].lastStateDate = datetime.fromisoformat(item['lastValueDate'])
+                r[key].lastStateDate = datetime.strptime(item['lastValueDate'], DATEFORMAT)
+            except:
+                r[key].lastStateDate = datetime.utcnow()
         return r      
 
 """
@@ -257,28 +271,27 @@ class JeedomHandler(socketserver.BaseRequestHandler):
             macAddress = args[2]
 
             if id in DEVICES:
+                # update
                 logging.debug('Update device in device.json')
                 DEVICES[id].humanName = name
                 DEVICES[id].deviceId = id
                 DEVICES[id].macAddress = macAddress
-                if id in THREADS:
-                    THREADS[id].stop()
                 response['result'] = 'Update OK'
             else:
+                # insert
                 logging.debug('Add new device in device.json')
                 DEVICES[id] = Phone(macAddress, id)
                 DEVICES[id].humanName = name
                 THREADS[id] = PhoneDetection(DEVICES[id], BTCONTROLLER, INTERVAL, PRESENTINTERVAL, jc)
                 response['result'] = 'Insert OK'
-
-            THREADS[id].start()
+                THREADS[id].start()
         
         if action == 'remove_device':
             id = args[0]
             if id in DEVICES:
                 del DEVICES[id]
                 if id in THREADS:
-                    THREADS[id].stop()
+                    THREADS[id].stop(False)
                     del THREADS[id]
                 response['result'] = 'Remove OK'
 
@@ -386,6 +399,8 @@ handlerThread.start()
 
 # Récupération des devices dans Jeedom
 DEVICES = jc.getDevices()
+
+jc.updateGlobalDevice()
 
 # Démarrage des threads
 THREADS = {}
