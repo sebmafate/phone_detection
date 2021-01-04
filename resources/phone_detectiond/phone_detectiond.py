@@ -166,10 +166,11 @@ class PhoneEncoder(json.JSONEncoder):
 Permet d'interroger Jeedom à partir du démon
 """
 class JeedomCallback:
-    def __init__(self, apikey, url): # , sleeptime, present_sleeptime, btController
+    def __init__(self, apikey, url, daemonName): # , sleeptime, present_sleeptime, btController
         logging.info('Create {} daemon'.format(PLUGIN_NAME))
         self.apikey = apikey
         self.url = url
+        self.daemonName = daemonName;
         # self.sleeptime = sleeptime
         # self.present_sleeptime = present_sleeptime
         # self.btController = btController
@@ -177,6 +178,7 @@ class JeedomCallback:
 
     def __request(self, m):
         response = None
+        m['source'] = self.daemonName;
         logging.debug('Send to jeedom :  {}'.format(m))
         r = requests.post('{}?apikey={}'.format(self.url, self.apikey), data=json.dumps(m), verify=False)
         logging.debug('Status Code :  {}'.format(r.status_code))
@@ -344,6 +346,7 @@ parser.add_argument('--pidfile', help='PID File', default='/tmp/jeedom/{}/{}d.pi
 parser.add_argument('--apikey', help='API Key', default='nokey')
 parser.add_argument('--device', help='{} port'.format(PLUGIN_NAME), default='hci0')
 parser.add_argument('--callback', help='Jeedom callback', default='http://localhost')
+parser.add_argument('--daemonname', help='Name of the antenna', default='local')
 parser.add_argument('--interval', help='Presence checking interval when phone is absent', default=10)
 parser.add_argument('--present_interval', help='Presence checking interval when phone is present', default=30)
 parser.add_argument('--absentThreshold', help='Time to consider a device absent', default=180)
@@ -361,6 +364,7 @@ logging.info('Socket : {}'.format(args.socket))
 logging.info('PID file : {}'.format(args.pidfile))
 logging.info('Device : {}'.format(args.device))
 logging.info('Callback : {}'.format(args.callback))
+logging.info('Daemon Name : {}'.format(args.daemonName))
 logging.info('Interval : {}'.format(args.interval))
 logging.info('Present Interval : {}'.format(args.present_interval))
 logging.info('AbsentThreshold: {}'.format(args.absentThreshold))
@@ -386,7 +390,7 @@ with open(args.pidfile, 'w') as fp:
     fp.write("%s\n" % pid)
 
 # Configure et test le callback vers jeedom
-jc = JeedomCallback(args.apikey, args.callback) # , int(args.interval), int(args.present_interval), args.device
+jc = JeedomCallback(args.apikey, args.callback, args.daemonName) # , int(args.interval), int(args.present_interval), args.device
 if not jc.test():
     sys.exit()
 
