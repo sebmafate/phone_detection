@@ -146,6 +146,7 @@ class PhoneDetection:
             else:
                 sleepTime = self.interval
             
+            self.callback.heartBeat()
             time.sleep(sleepTime)
 
 """
@@ -197,10 +198,17 @@ class JeedomCallback:
         return self.__request(message)
 
     def test(self):
-        logging.debug('Send to test to jeedom')
+        logging.debug('Send to heartbeat to jeedom')
         r = self.__send_now({'action': 'test'})
         if not r or not r.get('success'):
             logging.error('Calling jeedom failed')
+            return False
+        return True
+
+    def heartbeat(self):
+        r = self.__send_now({'action':'heartbeat'})
+        if not r or not r.get('success'):
+            logging.error('Error during heartbeat')
             return False
         return True
 

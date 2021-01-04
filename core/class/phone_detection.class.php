@@ -135,6 +135,9 @@ class phone_detection extends eqLogic
         $user=$remoteObject->getConfiguration('remoteUser');
         $device=$remoteObject->getConfiguration('remoteDevice');
         $script_path = '/home/'.$user.'/phone_detectiond/resources/phone_detectiond';
+        $interval = config::byKey('interval', 'phone_detection', 10);
+        $present_interval = config::byKey('present_interval', 'phone_detection', 30);
+        $absentThreshold = config::byKey('absentThreshold', 'phone_detection', 180);
         $cmd = '/usr/bin/python3 ' . $script_path . '/phone_detectiond.py';
         $cmd .= ' --loglevel ' . log::convertLogLevel(log::getLogLevel('phone_detection'));
         $cmd .= ' --device ' . $device;
@@ -417,14 +420,14 @@ class phone_detection extends eqLogic
             $last = $remote->getCache('lastupdate','0');
             if (($last == '0' or time() - strtotime($last)>65)) {
                 $auto = $remote->getConfiguration('remoteDaemonAuto','0');
-                //foreach ($allEqlogic as $eqLogic){
+                foreach ($allEqlogic as $eqLogic){
                     //$rssicmd = $eqLogic->getCmd(null, 'rssi' . $remote->getRemoteName());
-                    //$presentcmd = $eqLogic->getCmd(null, 'present' . $remote->getRemoteName());
-                    //$eqLogic->checkAndUpdateCmd($presentcmd, 0);
                     //$eqLogic->checkAndUpdateCmd($rssicmd, -200);
                     //$eqLogic->setCache('rssi' . $remote->getRemoteName(),-200);
-                    //$eqLogic->computePresence();
-                //}
+                    $stateCmd = $eqLogic->getCmd(null, 'state_' . $remote->getRemoteName());
+                    $eqLogic->checkAndUpdateCmd($stateCmd, 0);
+                    $eqLogic->computePresence();
+                }
                 if ($auto == 1){
                     log::add('phone_detection','info','Restarting daemon on remote ' . $remote->getRemoteName());
                     phone_detection::launchremote($remote->getId());
@@ -433,14 +436,14 @@ class phone_detection extends eqLogic
         }
         $deamon_info = self::deamon_info();
         if ($deamon_info['state'] != 'ok'){
-            //foreach ($allEqlogic as $eqLogic){
+            foreach ($allEqlogic as $eqLogic){
             //    $rssicmd = $eqLogic->getCmd(null, 'rssilocal');
-            //    $presentcmd = $eqLogic->getCmd(null, 'presentlocal');
-            //    $eqLogic->checkAndUpdateCmd($presentcmd, 0);
             //    $eqLogic->checkAndUpdateCmd($rssicmd, -200);
             //    $eqLogic->setCache('rssilocal',-200);
-            //    $eqLogic->computePresence();
-            //}
+                $stateCmd = $eqLogic->getCmd(null, 'state_local');
+                $eqLogic->checkAndUpdateCmd($stateCmd, 0);
+                $eqLogic->computePresence();
+            }
         }
     }
 
@@ -448,14 +451,13 @@ class phone_detection extends eqLogic
         $remotes = phone_detection_remote::getCacheRemotes('allremotes',array());
         $availremote= array();
         foreach ($remotes as $remote) {
-            log::add('phone_detection', 'debug', 'cacheRemotes: ' . $remote); 
-            self::getRemoteLog($remote->getId());
             $availremote[] = $remote->getRemoteName();
+            self::getRemoteLog($remote->getId());
         }
         foreach (eqLogic::byType('phone_detection') as $eqLogic){
             foreach ($eqLogic->getCmd('info') as $cmd) {
                 $logicalId = $cmd->getLogicalId();
-                if (substr($logicalId,0,4) == 'rssi'){
+                /*if (substr($logicalId,0,4) == 'rssi'){
                     $remotename= substr($logicalId,4);
                     if ($remotename != 'local' && $remotename != 'local' && !(in_array($remotename,$availremote))){
                         $cmd->remove();
@@ -464,8 +466,8 @@ class phone_detection extends eqLogic
                             $cmd->remove();
                         }
                     }
-                } else if (substr($logicalId,0,7) == 'present' && $logicalId!= 'present') {
-                    $remotename= substr($logicalId,7);
+                } else*/ if (substr($logicalId,0,6) == 'state_' && $logicalId != 'state') {
+                    $remotename= substr($logicalId,6);
                     if ($remotename != 'local' && !(in_array($remotename,$availremote))){
                         $cmd->remove();
                     } else if ($remotename == 'local') {
@@ -509,15 +511,37 @@ class phone_detection extends eqLogic
     }
 
 
-
-    public static function sendIdToDeamon() {
-        foreach (self::byType('phone_detection') as $eqLogic) {
-            $eqLogic->allowDevice();
-            usleep(500);
+    public function computePresence() {
+        $globalState = 0;
+        $stateCmd = $this->getCmd(null, 'state');
+        if (!is_object($stateCmd)) {
+            $stateCmd = new phone_detectionCmd();
+            $stateCmd->setLogicalId('state');
+            $stateCmd->setIsVisible(0);
+            $stateCmd->setIsHistorized(0);
+            $stateCmd->setName(__('Etat', __FILE__));
+            $stateCmd->setType('info');
+            $stateCmd->setSubType('binary');
+            $stateCmd->setTemplate('dashboard','line');
+            $stateCmd->setTemplate('mobile','line');
+            $stateCmd->setEqLogic_id($this->getId());
+            $stateCmd->save();
         }
-        $value = json_encode(array('apikey' => jeedom::getApiKey('phone_detection'), 'cmd' => 'ready'));
-        log::add('phone_detection', 'info', 'Sending ready to daemons');
-        self::socket_connection($value,True);
+        if ($stateCmd->getConfiguration('returnStateValue') == 0 || $stateCmd->getConfiguration('returnStateTime') == 2){
+            $stateCmd->setConfiguration('returnStateValue','');
+            $stateCmd->setConfiguration('returnStateTime','');
+            $stateCmd->save();
+        }
+        foreach ($this->getCmd('info') as $cmd) {
+            if (substr($cmd->getLogicalId(),0,6) == 'state_' && $cmd->getLogicalId() != 'state'){
+                $globalPresence += $cmd->execCmd();
+            }
+        }
+        if ($globalPresence > 0) {
+            $this->checkAndUpdateCmd($stateCmd, 1);
+        } else {
+            $this->checkAndUpdateCmd($stateCmd, 0);
+        }
     }
 
     /// END REMOTE ANTENNAS
