@@ -32,8 +32,8 @@ function phone_detection_update() {
 ;
     config::save('version',phone_detection::$_version,'phone_detection');
     if (config::byKey('allowUpdateAntennas','phone_detection',0) == 1) {
-        log::add('blea','info','Mise a jour des fichiers de toutes les antennes');
-        blea::send_allremotes();
+        log::add('phone_detection','info','Mise a jour des fichiers de toutes les antennes');
+        phone_detection::send_allremotes();
     }
 
     phone_detection::dependancy_install();

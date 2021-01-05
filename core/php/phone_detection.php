@@ -3,14 +3,18 @@
 require_once dirname(__FILE__) . "/../../../../core/php/core.inc.php";
 
 if (!jeedom::apiAccess(init('apikey'), 'phone_detection')) {
-    echo __('Vous n\'êtes pas autorisé à effectuer cette action', __FILE__);
+    echo __('Vous n\'êtes pas autorie a effectuer cette action', __FILE__);
     die();
 }
 
-$results = json_decode(file_get_contents("php://input"), true);
-$action  = $results['action'];
-$value   = 0;
-$remotes = phone_detection_remote::getCacheRemotes('allremotes',array());
+$results  = json_decode(file_get_contents("php://input"), true);
+$action   = $results['action'];
+$value    = 0;
+$antennas = phone_detection_remote::getCacheRemotes('allremotes',array());
+if (config::byKey('noLocal', 'phone_detection', 0) == 1){
+    $local = array(id=>0,remoteName>='local',configuration=>array());
+    array_push($antennas, $local);
+}
 
 switch ($action) {
     case "update_device_status":
@@ -23,9 +27,9 @@ switch ($action) {
         $eqLogic = eqLogic::byId($id);
         log::add('phone_detection','debug', 'Device Name: '. $eqLogic->getHumanName());
         if ($eqLogic->getConfiguration('deviceType') == 'phone' && $eqLogic->isEnabled()) {
-            foreach ($remotes as $remote){
-                if ($remote->getRemoteName() == $results['source']){
-                    $remote->setCache('lastupdate', date("Y-m-d H:i:s"));
+            foreach ($antennas as $antenna){
+                if ($antenna->getRemoteName() == $results['source']){
+                    $antenna->setCache('lastupdate', date("Y-m-d H:i:s"));
                     $statePropertyCmd = $eqLogic->getCmd(null, 'state_' . $results['source']);
                     if (!is_object($statePropertyCmd)) {
                         $statePropertyCmd = new phone_detection_Cmd();
@@ -54,9 +58,9 @@ switch ($action) {
     case "test":
         log::add('phone_detection','info','Receive a test from antenna ' . $results['source']);
         if ($results['source'] != 'local'){
-            foreach ($remotes as $remote){
-                if ($remote->getRemoteName() == $results['source']){
-                    $remote->setCache('lastupdate', date("Y-m-d H:i:s"));
+            foreach ($antennas as $antenna){
+                if ($antenna->getRemoteName() == $results['source']){
+                    $antenna->setCache('lastupdate', date("Y-m-d H:i:s"));
                     break;
                 }
             }
@@ -68,9 +72,9 @@ switch ($action) {
     case "heartbeat":
         log::add('phone_detection','info','This is a heartbeat from antenna ' . $results['source']);
         if ($results['source'] != 'local'){
-            foreach ($remotes as $remote){
-                if ($remote->getRemoteName() == $results['source']){
-                    $remote->setCache('lastupdate', date("Y-m-d H:i:s"));
+            foreach ($antennas as $antenna){
+                if ($antenna->getRemoteName() == $results['source']){
+                    $antenna->setCache('lastupdate', date("Y-m-d H:i:s"));
                     break;
                 }
             }
@@ -86,9 +90,9 @@ switch ($action) {
         $eqLogic = eqLogic::byId($id);
 
         $values = Null;
-        foreach ($remotes as $remote){
-            if ($remote->getRemoteName() == $results['source']){
-                $remote->setCache('lastupdate', date("Y-m-d H:i:s"));
+        foreach ($antennas as $antenna){
+            if ($antenna->getRemoteName() == $results['source']){
+                $antenna->setCache('lastupdate', date("Y-m-d H:i:s"));
                 $statePropertyCmd = $eqLogic->getCmd(null, 'state_' . $results['source']);
                 if (!is_object($statePropertyCmd)) {
                     $statePropertyCmd = new phone_detection_Cmd();
@@ -131,9 +135,9 @@ switch ($action) {
                 continue;
             }
 
-            foreach ($remotes as $remote){
-                if ($remote->getRemoteName() == $results['source']){
-                    $remote->setCache('lastupdate', date("Y-m-d H:i:s"));
+            foreach ($antennas as $antenna){
+                if ($antenna->getRemoteName() == $results['source']){
+                    $antenna->setCache('lastupdate', date("Y-m-d H:i:s"));
                     $statePropertyCmd = $d->getCmd(null, 'state_' . $results['source']);
                     if (!is_object($statePropertyCmd)) {
                         $statePropertyCmd = new phone_detection_Cmd();
@@ -149,7 +153,7 @@ switch ($action) {
                         $statePropertyCmd->save();
                     }
 
-                    $statePropertyCmd = $d->getCmd('info', 'state_' . $results['source']));
+                    $statePropertyCmd = $d->getCmd('info', 'state_' . $results['source']);
                     $stateValue = $statePropertyCmd->execCmd() == 1;
                     $getValueDate = $statePropertyCmd->getValueDate();
                     $name = $d->getName();

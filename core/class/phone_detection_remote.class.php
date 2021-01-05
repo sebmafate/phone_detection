@@ -211,5 +211,4 @@ class phone_detection_remote {
 		$this->configuration = utils::setJsonAttr($this->configuration, $_key, $_value);
 		return $this;
 	}
-
 }

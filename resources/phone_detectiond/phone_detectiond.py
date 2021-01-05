@@ -30,6 +30,7 @@ PLUGIN_NAME = "phone_detection"
 DEVICES = {}
 THREADS = {}
 DATEFORMAT = '%Y-%m-%d %H:%M:%S'
+LOGLEVEL = logging.CRITICAL;
 
 """
 Classe permettant de regrouper les informations d'un téléphone
@@ -167,11 +168,11 @@ class PhoneEncoder(json.JSONEncoder):
 Permet d'interroger Jeedom à partir du démon
 """
 class JeedomCallback:
-    def __init__(self, apikey, url, daemonName): # , sleeptime, present_sleeptime, btController
+    def __init__(self, apikey, url, daemonname): # , sleeptime, present_sleeptime, btController
         logging.info('Create {} daemon'.format(PLUGIN_NAME))
         self.apikey = apikey
         self.url = url
-        self.daemonName = daemonName;
+        self.daemonname = daemonname;
         # self.sleeptime = sleeptime
         # self.present_sleeptime = present_sleeptime
         # self.btController = btController
@@ -179,7 +180,7 @@ class JeedomCallback:
 
     def __request(self, m):
         response = None
-        m['source'] = self.daemonName;
+        m['source'] = self.daemonname;
         logging.debug('Send to jeedom :  {}'.format(m))
         r = requests.post('{}?apikey={}'.format(self.url, self.apikey), data=json.dumps(m), verify=False)
         logging.debug('Status Code :  {}'.format(r.status_code))
@@ -305,6 +306,23 @@ class JeedomHandler(socketserver.BaseRequestHandler):
                     del THREADS[id]
                 response['result'] = 'Remove OK'
 
+        if action == 'logdebug':
+            logging.debug('Dynamically change log to debug')
+            log = logging.getLogger()
+            for hdlr in log.handlers[:]:
+               log.removeHandler(hdlr)
+               jeedom_utils.set_log_level('debug')
+               response['result'] = 'logdebug OK'
+
+        if action == 'lognormal':
+            logging.debug('Dynamically restore the default log level')
+            log = logging.getLogger()
+            for hdlr in log.handlers[:]:
+               log.removeHandler(hdlr)
+               jeedom_utils.set_log_level(LOGLEVEL)
+               response['result'] = 'lognormal OK'
+
+
         self.request.sendall(json.dumps(response, cls=PhoneEncoder).encode())
 
 """
@@ -337,9 +355,10 @@ def shutdown():
         THREADS[key].stop(False)
     logging.info("Shutting down local server")
     server.shutdown()
-    logging.info("Removing Socket file " + str(_sockfile))
-    if os.path.exists(_sockfile):
-        os.remove(_sockfile)
+    server.fclose()
+    #logging.info("Removing Socket file " + str(_sockfile))
+    #if os.path.exists(_sockfile):
+    #    os.remove(_sockfile)
     logging.info("Removing PID file " + str(_pidfile))
     if os.path.exists(_pidfile):
         os.remove(_pidfile)
@@ -349,8 +368,10 @@ def shutdown():
 ### Init & Start
 parser = argparse.ArgumentParser()
 parser.add_argument('--loglevel', help='LOG Level', default='error')
-parser.add_argument('--socket', help='Daemon socket', default='/tmp/jeedom/{}/{}d.sock'.format(PLUGIN_NAME, PLUGIN_NAME))
-parser.add_argument('--pidfile', help='PID File', default='/tmp/jeedom/{}/{}d.pid'.format(PLUGIN_NAME, PLUGIN_NAME))
+#parser.add_argument('--socket', help='Daemon socket', default='/tmp/jeedom/{}/{}d.sock'.format(PLUGIN_NAME, PLUGIN_NAME))
+parser.add_argument('--sockethost', help='Daemon socket host', default='127.0.0.1')
+parser.add_argument('--socketport', help='Daemon socket port', default='55009')
+parser.add_argument('--pidfile', help='PID File', default='/tmp/{}d.pid'.format(PLUGIN_NAME))
 parser.add_argument('--apikey', help='API Key', default='nokey')
 parser.add_argument('--device', help='{} port'.format(PLUGIN_NAME), default='hci0')
 parser.add_argument('--callback', help='Jeedom callback', default='http://localhost')
@@ -361,25 +382,29 @@ parser.add_argument('--absentThreshold', help='Time to consider a device absent'
 args = parser.parse_args()
 
 FORMAT = '[%(asctime)-15s][%(levelname)s][%(name)s](%(threadName)s) : %(message)s'
-logging.basicConfig(level=convert_log_level(args.loglevel),
+LOGLEVEL = convert_log_level(args.loglevel);
+LOGLEVEL = logging.DEBUG
+logging.basicConfig(level=LOGLEVEL,
                     format=FORMAT, datefmt="%Y-%m-%d %H:%M:%S")
 urllib3_logger = logging.getLogger('urllib3')
 urllib3_logger.setLevel(logging.CRITICAL)
 
 logging.info('Start {}d'.format(PLUGIN_NAME))
 logging.info('Log level : {}'.format(args.loglevel))
-logging.info('Socket : {}'.format(args.socket))
+#logging.info('Socket : {}'.format(args.socket))
+logging.info('SocketHost : {}'.format(args.sockethost))
+logging.info('SocketPort : {}'.format(args.socketport))
 logging.info('PID file : {}'.format(args.pidfile))
 logging.info('Device : {}'.format(args.device))
 logging.info('Callback : {}'.format(args.callback))
-logging.info('Daemon Name : {}'.format(args.daemonName))
+logging.info('Daemon Name : {}'.format(args.daemonname))
 logging.info('Interval : {}'.format(args.interval))
 logging.info('Present Interval : {}'.format(args.present_interval))
 logging.info('AbsentThreshold: {}'.format(args.absentThreshold))
 logging.info('Python version : {}'.format(sys.version))
 
 _pidfile = args.pidfile
-_sockfile = args.socket
+#_sockfile = args.socket
 _apikey = args.apikey
 
 BTCONTROLLER = args.device
@@ -398,14 +423,16 @@ with open(args.pidfile, 'w') as fp:
     fp.write("%s\n" % pid)
 
 # Configure et test le callback vers jeedom
-jc = JeedomCallback(args.apikey, args.callback, args.daemonName) # , int(args.interval), int(args.present_interval), args.device
+jc = JeedomCallback(args.apikey, args.callback, args.daemonname) # , int(args.interval), int(args.present_interval), args.device
 if not jc.test():
     sys.exit()
 
 # Démarre le serveur qui écoute les requests de jeedom
-if os.path.exists(args.socket):
-    os.unlink(args.socket)
-server = socketserver.UnixStreamServer(args.socket, JeedomHandler)
+#if os.path.exists(args.socket):
+#    os.unlink(args.socket)
+#server = socketserver.UnixStreamServer(args.socket, JeedomHandler)
+server = socketserver.TCPServer((args.sockethost, args.socketport), JeedomHandler)
+
 handlerThread = threading.Thread(target=server.serve_forever)
 handlerThread.start()
 

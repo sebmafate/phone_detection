@@ -217,29 +217,31 @@ foreach ($remotes as $remote) {
 
 	function displayPhoneDetectionRemoteComm(_id){
         console.log('BR>> displayPhoneDetectionRemoteComm=' + _id);
-		$('.li_PhoneDetectionRemote').removeClass('active');
-		$('.li_PhoneDetectionRemote[data-PhoneDetectionRemote_id='+_id+']').addClass('active');
-		$.ajax({
-			type: "POST",
-			url: "plugins/"+plugin+"/core/ajax/"+plugin+".ajax.php",
-			data: {
-				action: "get_PhoneDetectionRemote",
-				id: _id,
-			},
-			dataType: 'json',
-			async: true,
-			global: false,
-			error: function (request, status, error) {
-			},
-			success: function (data) {
-				if (data.state != 'ok') {
-					return;
-				}
-				$('.PhoneDetectionRemote').show();
-				$('.PhoneDetectionRemoteAttrcomm').value('');
-				$('.PhoneDetectionRemote').setValues(data.result,'.PhoneDetectionRemoteAttrcomm');
-			}
-		});
+        if (_id != undefined) {
+		    $('.li_PhoneDetectionRemote').removeClass('active');
+		    $('.li_PhoneDetectionRemote[data-PhoneDetectionRemote_id='+_id+']').addClass('active');
+		    $.ajax({
+			    type: "POST",
+			    url: "plugins/"+plugin+"/core/ajax/"+plugin+".ajax.php",
+			    data: {
+				    action: "get_PhoneDetectionRemote",
+				    id: _id,
+			    },
+			    dataType: 'json',
+			    async: true,
+			    global: false,
+			    error: function (request, status, error) {
+			    },
+			    success: function (data) {
+				    if (data.state != 'ok') {
+					    return;
+				    }
+				    $('.PhoneDetectionRemote').show();
+				    $('.PhoneDetectionRemoteAttrcomm').value('');
+				    $('.PhoneDetectionRemote').setValues(data.result,'.PhoneDetectionRemoteAttrcomm');
+			    }
+		    });
+        }
 	}
 
 	$('.li_PhoneDetectionRemote').on('click',function(){

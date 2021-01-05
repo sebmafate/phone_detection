@@ -136,7 +136,7 @@ try {
 
     if (init('action') == 'sendRemoteFiles') {
         if (!phone_detection::sendRemoteFiles(init('remoteId'))) {
-            ajax::error(__('Erreur, vérifiez la log Blea', __FILE__));
+            ajax::error(__('Erreur, vérifiez la logphone_detection', __FILE__));
         }
         ajax::success();
     }
