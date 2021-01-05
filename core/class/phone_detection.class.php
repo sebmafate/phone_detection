@@ -26,7 +26,6 @@ class phone_detection extends eqLogic
            'args' => $args,
            'apikey' => jeedom::getApiKey('phone_detection')
         ];
-        $encode = json_encode($query);
 
         if (config::byKey('noLocal', 'phone_detection', 0) == 0){
             //$sock = 'unix://' . jeedom::getTmpFolder('phone_detection') . '/daemon.sock';
@@ -48,19 +47,26 @@ class phone_detection extends eqLogic
      * @param  string $args   Other arguments.
      * @return array  Result of the callZiGate.
      */
-    public static function callDaemon($encode, $sock)
+    public static function callDaemon($query, $sock)
     {
-        log::add('phone_detection', 'debug', 'callDaemon ' . print_r($encode, true));
-        $fp = stream_socket_client($sock, $errno, $errstr);
+        log::add('phone_detection', 'debug', 'callDaemon (' .$sock.') '. print_r($query, true));
+        $fp = stream_socket_client($sock, $errno, $errstr, 5);
         $result = '';
         log::add('phone_detection', 'debug', 'error ' . $errno .' : '. $errstr);
 
         if ($fp) {
             try {
-                fwrite($fp, $query);
-                while (!feof($fp)) {
-                    $result .= fgets($fp, 1024);
-                }
+		stream_set_timeout($fp, 5);
+                if (false !== fwrite($fp, json_encode($query))) {
+                    while (!feof($fp)) {
+                        $result .= fgets($fp, 1024);
+	                $info = stream_get_meta_data($fp);
+		        if ($info['timed_out']) {
+                            log::add('phone_detection', 'info', 'timeout in callDaemon('.$sock.') '.print_r($result, true));
+			    $result = '';
+		        } 
+                    }
+	        }
             } catch( Exception $ex) {
                 log::add('phone_detection', 'info', print_r($ex));
             } finally {
@@ -499,11 +505,11 @@ class phone_detection extends eqLogic
         }
     }
 
-    public static function callRemoteDaemon($encode, $remote) {
+    public static function callRemoteDaemon($query, $remote) {
         $ip = $remote->getConfiguration('remoteIp');
         $sock = 'tcp://' . $ip . ':' . config::byKey('socketport', 'phone_detection', 55009);
         $remote->setCache('lastupdate','0');
-        phone_detection::callDaemon($encode, $sock);
+        phone_detection::callDaemon($query, $sock);
     }
 
     public static function changeLogLive($_level) {

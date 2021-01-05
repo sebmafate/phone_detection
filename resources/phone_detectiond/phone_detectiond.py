@@ -147,7 +147,6 @@ class PhoneDetection:
             else:
                 sleepTime = self.interval
             
-            self.callback.heartBeat()
             time.sleep(sleepTime)
 
 """
@@ -199,7 +198,7 @@ class JeedomCallback:
         return self.__request(message)
 
     def test(self):
-        logging.debug('Send to heartbeat to jeedom')
+        logging.debug('Send to test connection to jeedom')
         r = self.__send_now({'action': 'test'})
         if not r or not r.get('success'):
             logging.error('Calling jeedom failed')
@@ -260,6 +259,8 @@ class JeedomCallback:
 Intercepte les demandes de Jeedom : update_device, insert_device et remove_device
 """
 class JeedomHandler(socketserver.BaseRequestHandler):
+    allow_reuse_address = True
+
     def handle(self):
         # self.request is the TCP socket connected to the client
         self.data = self.request.recv(1024)
@@ -269,6 +270,7 @@ class JeedomHandler(socketserver.BaseRequestHandler):
         del lmessage['apikey']
         logging.debug(lmessage)
         response = {'result': None, 'success': True}
+        stop = False
         if message.get('apikey') != _apikey:
             logging.error("Invalid apikey from socket : {}".format(self.data))
             return
@@ -277,33 +279,33 @@ class JeedomHandler(socketserver.BaseRequestHandler):
         args = message.get('args')
 
         if action == 'update_device' or action == 'insert_device':
-            id = args[0]
+            mid = args[0]
             name = args[1]
             macAddress = args[2]
 
-            if id in DEVICES:
+            if mid in DEVICES:
                 # update
                 logging.debug('Update device in device.json')
-                DEVICES[id].humanName = name
-                DEVICES[id].deviceId = id
-                DEVICES[id].macAddress = macAddress
+                DEVICES[mid].humanName = name
+                DEVICES[mid].deviceId = mid
+                DEVICES[mid].macAddress = macAddress
                 response['result'] = 'Update OK'
             else:
                 # insert
                 logging.debug('Add new device in device.json')
-                DEVICES[id] = Phone(macAddress, id)
-                DEVICES[id].humanName = name
-                THREADS[id] = PhoneDetection(DEVICES[id], BTCONTROLLER, INTERVAL, PRESENTINTERVAL, jc)
+                DEVICES[mid] = Phone(macAddress, mid)
+                DEVICES[mid].humanName = name
+                THREADS[mid] = PhoneDetection(DEVICES[mid], BTCONTROLLER, INTERVAL, PRESENTINTERVAL, jc)
                 response['result'] = 'Insert OK'
-                THREADS[id].start()
+                THREADS[mid].start()
         
         if action == 'remove_device':
-            id = args[0]
-            if id in DEVICES:
-                del DEVICES[id]
-                if id in THREADS:
-                    THREADS[id].stop(False)
-                    del THREADS[id]
+            mid = args[0]
+            if mid in DEVICES:
+                del DEVICES[mid]
+                if mid in THREADS:
+                    THREADS[mid].stop(False)
+                    del THREADS[mid]
                 response['result'] = 'Remove OK'
 
         if action == 'logdebug':
@@ -322,8 +324,53 @@ class JeedomHandler(socketserver.BaseRequestHandler):
                jeedom_utils.set_log_level(LOGLEVEL)
                response['result'] = 'lognormal OK'
 
+        if action == 'stop':
+            logging.debug('Receive stop request from jeedom')
+            stop = True
 
         self.request.sendall(json.dumps(response, cls=PhoneEncoder).encode())
+
+        if stop == True:
+            os.kill(os.getpid(),signal.SIGTERM) 
+             
+
+
+"""
+Class gérant le threadle heartbeat
+"""
+class HeartbeatThread:
+    def __init__(self, callback):
+        self._stop = False
+        self.callback = callback
+
+    def start(self):
+        logging.info('Start heartbeat thread')
+        self._stop = False
+        self.t = threading.Thread(target=self.__run)
+        self.t.daemon = True
+        self.t.start()
+    
+    def stop(self, waitForStop = True):
+        logging.info('Stop heartbeat thread')
+        self._stop = True
+        if waitForStop:
+            self.t.join()
+            del self.t 
+            gc.collect()
+    
+    def __run(self):
+        sleepTime = 30
+        while not self._stop:
+            self.callback.heartbeat()
+            time.sleep(sleepTime)
+
+
+"""
+class pour gerer le server TCP.
+"""
+class LocalTcpServer(socketserver.TCPServer):
+    allow_reuse_address = True
+
 
 """
 Converti le loglevel envoyer par jeedom 
@@ -353,9 +400,10 @@ def shutdown():
     for key in THREADS:
         logging.info("\t==> {}".format(THREADS[key].device.humanName))
         THREADS[key].stop(False)
+    HEARTBEAT.stop(False)
     logging.info("Shutting down local server")
-    server.shutdown()
-    server.fclose()
+    server.shutdown() 
+    server.server_close()
     #logging.info("Removing Socket file " + str(_sockfile))
     #if os.path.exists(_sockfile):
     #    os.remove(_sockfile)
@@ -383,7 +431,6 @@ args = parser.parse_args()
 
 FORMAT = '[%(asctime)-15s][%(levelname)s][%(name)s](%(threadName)s) : %(message)s'
 LOGLEVEL = convert_log_level(args.loglevel);
-LOGLEVEL = logging.DEBUG
 logging.basicConfig(level=LOGLEVEL,
                     format=FORMAT, datefmt="%Y-%m-%d %H:%M:%S")
 urllib3_logger = logging.getLogger('urllib3')
@@ -427,12 +474,16 @@ jc = JeedomCallback(args.apikey, args.callback, args.daemonname) # , int(args.in
 if not jc.test():
     sys.exit()
 
+# Demarrage des heartbeat vers jeedom
+HEARTBEAT = HeartbeatThread(jc)
+HEARTBEAT.start()
+
 # Démarre le serveur qui écoute les requests de jeedom
 #if os.path.exists(args.socket):
 #    os.unlink(args.socket)
 #server = socketserver.UnixStreamServer(args.socket, JeedomHandler)
-server = socketserver.TCPServer((args.sockethost, args.socketport), JeedomHandler)
 
+server = LocalTcpServer((args.sockethost, int(args.socketport)), JeedomHandler)
 handlerThread = threading.Thread(target=server.serve_forever)
 handlerThread.start()
 
@@ -443,6 +494,7 @@ jc.updateGlobalDevice()
 
 # Démarrage des threads
 THREADS = {}
+
 for key in DEVICES:
     THREADS[key] = PhoneDetection(DEVICES[key], args.device, INTERVAL, PRESENTINTERVAL, jc)
     THREADS[key].start()

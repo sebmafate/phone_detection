@@ -17,7 +17,7 @@
  */
 
 try {
-	require_once dirname(__FILE__) . '/../../../../core/php/core.inc.php';
+    require_once dirname(__FILE__) . '/../../../../core/php/core.inc.php';
     require_once dirname(__FILE__) . '/../class/phone_detection_remote.class.php';
 
 	include_file('core', 'authentification', 'php');
@@ -28,18 +28,6 @@ try {
 
 	ajax::init();
 
-    /*
-	if (init('action') == 'getAllTypes') {
-		$list = array();
-		$allconfs = phone_detection::devicesParameters();
-		foreach ($allconfs as $key=>$data){
-			$list[$data['name']] = $data['configuration']['name'];
-		}
-		ksort($list);
-		ajax::success($list);
-	}
-    */
-	
     /*
 	if (init('action') == 'allantennas') {
 		if (init('remote') == 'local') {
@@ -116,12 +104,12 @@ try {
 	}
 
 	if (init('action') == 'get_PhoneDetectionRemote') {
-        log::add('phone_detection', 'debug', 'BR>> get_PhoneDetectionRemote = ' . init('id'));
+        //log::add('phone_detection', 'debug', 'BR>> get_PhoneDetectionRemote = ' . init('id'));
 		$phone_detection_remote = phone_detection_remote::byId(init('id'));
 		if (!is_object($phone_detection_remote)) {
 			throw new Exception(__('Remote inconnu : ', __FILE__) . init('id'), 9999);
 		}
-        log::add('phone_detection', 'debug', 'BR>> get_PhoneDetectionRemote = return ' . jeedom::toHumanReadable(utils::o2a($phone_detection_remote)));
+        //log::add('phone_detection', 'debug', 'BR>> get_PhoneDetectionRemote = return ' . jeedom::toHumanReadable(utils::o2a($phone_detection_remote)));
 		ajax::success(jeedom::toHumanReadable(utils::o2a($phone_detection_remote)));
 	}
 
@@ -188,7 +176,7 @@ try {
 	throw new Exception('Aucune methode correspondante');
 	/*     * *********Catch exeption*************** */
 } catch (Exception $e) {
-    log::add('phone_detection', 'error', 'EXCEPTION ' . $e->getMessage . '(' . $e->getCode() . ')');
-	ajax::error(displayException($e), $e->getCode());
+    //log::add('phone_detection', 'error', 'EXCEPTION ' . $e->getMessage . '(' . $e->getCode() . ')');
+    ajax::error(displayException($e), $e->getCode());
 }
 ?>

@@ -26,17 +26,17 @@ switch ($action) {
 
         $eqLogic = eqLogic::byId($id);
         log::add('phone_detection','debug', 'Device Name: '. $eqLogic->getHumanName());
-        if ($eqLogic->getConfiguration('deviceType') == 'phone' && $eqLogic->isEnabled()) {
+        if ($eqLogic->getConfiguration('deviceType') == 'phone' && $eqLogic->getIsEnable()) {
             foreach ($antennas as $antenna){
                 if ($antenna->getRemoteName() == $results['source']){
                     $antenna->setCache('lastupdate', date("Y-m-d H:i:s"));
                     $statePropertyCmd = $eqLogic->getCmd(null, 'state_' . $results['source']);
                     if (!is_object($statePropertyCmd)) {
-                        $statePropertyCmd = new phone_detection_Cmd();
+                        $statePropertyCmd = new phone_detectionCmd();
                         $statePropertyCmd->setLogicalId('state_' . $results['source']);
                         $statePropertyCmd->setIsVisible(0);
                         $statePropertyCmd->setIsHistorized(0);
-                        $statePropertyCmd->setName(__('state_ '. $results['source'], __FILE__));
+                        $statePropertyCmd->setName(__('Etat_'. $results['source'], __FILE__));
                         $statePropertyCmd->setType('info');
                         $statePropertyCmd->setSubType('binary');
                         $statePropertyCmd->setTemplate('dashboard','line');
@@ -70,7 +70,7 @@ switch ($action) {
         break;
 
     case "heartbeat":
-        log::add('phone_detection','info','This is a heartbeat from antenna ' . $results['source']);
+        log::add('phone_detection','debug','This is a heartbeat from antenna ' . $results['source']);
         if ($results['source'] != 'local'){
             foreach ($antennas as $antenna){
                 if ($antenna->getRemoteName() == $results['source']){
@@ -95,20 +95,19 @@ switch ($action) {
                 $antenna->setCache('lastupdate', date("Y-m-d H:i:s"));
                 $statePropertyCmd = $eqLogic->getCmd(null, 'state_' . $results['source']);
                 if (!is_object($statePropertyCmd)) {
-                    $statePropertyCmd = new phone_detection_Cmd();
+                    $statePropertyCmd = new phone_detectionCmd();
                     $statePropertyCmd->setLogicalId('state_' . $results['source']);
                     $statePropertyCmd->setIsVisible(0);
                     $statePropertyCmd->setIsHistorized(0);
-                    $statePropertyCmd->setName(__('state_ '. $results['source'], __FILE__));
+                    $statePropertyCmd->setName(__('Etat_'. $results['source'], __FILE__));
                     $statePropertyCmd->setType('info');
                     $statePropertyCmd->setSubType('binary');
                     $statePropertyCmd->setTemplate('dashboard','line');
                     $statePropertyCmd->setTemplate('mobile','line');
                     $statePropertyCmd->setEqLogic_id($eqLogic->getId());
                     $statePropertyCmd->save();
+                    $eqLogic->checkAndUpdateCmd($statePropertyCmd,0);
                 }
-
-                $statePropertyCmd = $eqLogic->getCmd('info', 'state');
                 $value = $statePropertyCmd->execCmd();
                 break;
             } 
@@ -131,7 +130,7 @@ switch ($action) {
         // $values["devices"] = $devices;
         
         foreach($devices as $d) {
-            if ($d->getConfiguration('deviceType') != 'phone' || $d->isEnable() == false) {
+            if ($d->getConfiguration('deviceType') != 'phone' || $d->getIsEnable() == false) {
                 continue;
             }
 
@@ -140,34 +139,33 @@ switch ($action) {
                     $antenna->setCache('lastupdate', date("Y-m-d H:i:s"));
                     $statePropertyCmd = $d->getCmd(null, 'state_' . $results['source']);
                     if (!is_object($statePropertyCmd)) {
-                        $statePropertyCmd = new phone_detection_Cmd();
+                        $statePropertyCmd = new phone_detectionCmd();
                         $statePropertyCmd->setLogicalId('state_' . $results['source']);
                         $statePropertyCmd->setIsVisible(0);
                         $statePropertyCmd->setIsHistorized(0);
-                        $statePropertyCmd->setName(__('state_ '. $results['source'], __FILE__));
+                        $statePropertyCmd->setName(__('Etat_'. $results['source'], __FILE__));
                         $statePropertyCmd->setType('info');
                         $statePropertyCmd->setSubType('binary');
                         $statePropertyCmd->setTemplate('dashboard','line');
                         $statePropertyCmd->setTemplate('mobile','line');
                         $statePropertyCmd->setEqLogic_id($d->getId());
                         $statePropertyCmd->save();
+                        $d->checkAndUpdateCmd($statePropertyCmd,0);
                     }
-
-                    $statePropertyCmd = $d->getCmd('info', 'state_' . $results['source']);
-                    $stateValue = $statePropertyCmd->execCmd() == 1;
+                    $stateValue   = $statePropertyCmd->execCmd() == 1;
                     $getValueDate = $statePropertyCmd->getValueDate();
-                    $name = $d->getName();
-                    $humanName = $d->getHumanName();
-                    $id = $d->getId();
-                    $macAddress = $d->getConfiguration('macAddress');
+                    $name         = $d->getName();
+                    $humanName    = $d->getHumanName();
+                    $id           = $d->getId();
+                    $macAddress   = $d->getConfiguration('macAddress');
             
                     $values[$id] = [
-                        "state" => $stateValue, 
+                        "state"         => $stateValue, 
                         "lastValueDate" => $getValueDate,
-                        "name" => $name,
-                        "humanName" => $humanName,
-                        "id" => $id,
-                        "macAddress" => $macAddress
+                        "name"          => $name,
+                        "humanName"     => $humanName,
+                        "id"            => $id,
+                        "macAddress"    => $macAddress
                     ];
                     break;
                 }
