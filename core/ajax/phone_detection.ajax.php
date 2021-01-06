@@ -28,54 +28,6 @@ try {
 
     ajax::init();
 
-    /*
-    if (init('action') == 'allantennas') {
-        if (init('remote') == 'local') {
-            if (init('type') == 'reception'){
-                foreach (eqLogic::byType('phone_detection') as $eqLogic){
-                    $eqLogic->setConfiguration('antennareceive','local');
-                    $eqLogic->save();
-                }
-            } else {
-                foreach (eqLogic::byType('phone_detection') as $eqLogic){
-                    $eqLogic->setConfiguration('antenna','local');
-                    $eqLogic->save();
-                }
-            }
-        } else {
-            if (init('type') == 'reception'){
-                foreach (eqLogic::byType('phone_detection') as $eqLogic){
-                    $eqLogic->setConfiguration('antennareceive',init('remoteId'));
-                    $eqLogic->save();
-                }
-            } else {
-                foreach (eqLogic::byType('phone_detection') as $eqLogic){
-                    $eqLogic->setConfiguration('antenna',init('remoteId'));
-                    $eqLogic->save();
-                }
-            }
-        }
-        ajax::success();
-    }
-    
-    if (init('action') == 'syncconfPhoneDetection') {
-        phone_detection::syncconfPhoneDetection(false);
-        ajax::success();
-    }
-
-    if (init('action') == 'getMobileGraph') {
-        ajax::success(phone_detection::getMobileGraph());
-    }
-
-    if (init('action') == 'getMobileHealth') {
-        ajax::success(phone_detection::getMobileHealth());
-    }
-
-    if (init('action') == 'saveAntennaPosition') {
-        ajax::success(phone_detection::saveAntennaPosition(init('antennas')));
-    }
-     */
-    
     if (init('action') == 'launchremotes') {
         ajax::success(phone_detection::launch_allremotes());
     }
@@ -104,12 +56,12 @@ try {
     }
 
     if (init('action') == 'get_PhoneDetectionRemote') {
-        //log::add('phone_detection', 'debug', 'BR>> get_PhoneDetectionRemote = ' . init('id'));
+        //log::add('phone_detection', 'debug', 'get_PhoneDetectionRemote = ' . init('id'));
         $phone_detection_remote = phone_detection_remote::byId(init('id'));
         if (!is_object($phone_detection_remote)) {
             throw new Exception(__('Remote inconnu : ', __FILE__) . init('id'), 9999);
         }
-        //log::add('phone_detection', 'debug', 'BR>> get_PhoneDetectionRemote = return ' . jeedom::toHumanReadable(utils::o2a($phone_detection_remote)));
+        //log::add('phone_detection', 'debug', 'get_PhoneDetectionRemote = return ' . jeedom::toHumanReadable(utils::o2a($phone_detection_remote)));
         ajax::success(jeedom::toHumanReadable(utils::o2a($phone_detection_remote)));
     }
 
