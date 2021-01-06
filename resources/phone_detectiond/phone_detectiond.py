@@ -30,7 +30,7 @@ PLUGIN_NAME = "phone_detection"
 DEVICES = {}
 THREADS = {}
 DATEFORMAT = '%Y-%m-%d %H:%M:%S'
-LOGLEVEL = logging.CRITICAL;
+LOGLEVEL = logging.WARNING;
 
 """
 Classe permettant de regrouper les informations d'un téléphone
@@ -313,16 +313,19 @@ class JeedomHandler(socketserver.BaseRequestHandler):
             log = logging.getLogger()
             for hdlr in log.handlers[:]:
                log.removeHandler(hdlr)
-               jeedom_utils.set_log_level('debug')
-               response['result'] = 'logdebug OK'
+               logging.basicConfig(level=logging.DEBUG,
+                                   format=FORMAT, datefmt="%Y-%m-%d %H:%M:%S")
+            response['result'] = 'logdebug OK'
+            logging.debug('logging level is now DEBUG')
 
         if action == 'lognormal':
             logging.debug('Dynamically restore the default log level')
             log = logging.getLogger()
             for hdlr in log.handlers[:]:
                log.removeHandler(hdlr)
-               jeedom_utils.set_log_level(LOGLEVEL)
-               response['result'] = 'lognormal OK'
+               logging.basicConfig(level=LOGLEVEL,
+                                   format=FORMAT, datefmt="%Y-%m-%d %H:%M:%S")
+            response['result'] = 'lognormal OK'
 
         if action == 'stop':
             logging.debug('Receive stop request from jeedom')
@@ -404,9 +407,10 @@ def shutdown():
     logging.info("Shutting down local server")
     server.shutdown() 
     server.server_close()
-    #logging.info("Removing Socket file " + str(_sockfile))
-    #if os.path.exists(_sockfile):
-    #    os.remove(_sockfile)
+    if (_sockfile != None and len(str(_sockfile)) > 0):
+        logging.info("Removing Socket file " + str(_sockfile))
+        if os.path.exists(_sockfile):
+            os.remove(_sockfile)
     logging.info("Removing PID file " + str(_pidfile))
     if os.path.exists(_pidfile):
         os.remove(_pidfile)
@@ -415,10 +419,10 @@ def shutdown():
 
 ### Init & Start
 parser = argparse.ArgumentParser()
-parser.add_argument('--loglevel', help='LOG Level', default='error')
-#parser.add_argument('--socket', help='Daemon socket', default='/tmp/jeedom/{}/{}d.sock'.format(PLUGIN_NAME, PLUGIN_NAME))
-parser.add_argument('--sockethost', help='Daemon socket host', default='127.0.0.1')
-parser.add_argument('--socketport', help='Daemon socket port', default='55009')
+parser.add_argument('--loglevel', help='LOG Level', default='warning')
+parser.add_argument('--socket', help='Daemon socket', default='')
+parser.add_argument('--sockethost', help='Daemon socket host', default='')
+parser.add_argument('--socketport', help='Daemon socket port', default='0')
 parser.add_argument('--pidfile', help='PID File', default='/tmp/{}d.pid'.format(PLUGIN_NAME))
 parser.add_argument('--apikey', help='API Key', default='nokey')
 parser.add_argument('--device', help='{} port'.format(PLUGIN_NAME), default='hci0')
@@ -438,7 +442,7 @@ urllib3_logger.setLevel(logging.CRITICAL)
 
 logging.info('Start {}d'.format(PLUGIN_NAME))
 logging.info('Log level : {}'.format(args.loglevel))
-#logging.info('Socket : {}'.format(args.socket))
+logging.info('Socket : {}'.format(args.socket))
 logging.info('SocketHost : {}'.format(args.sockethost))
 logging.info('SocketPort : {}'.format(args.socketport))
 logging.info('PID file : {}'.format(args.pidfile))
@@ -451,7 +455,7 @@ logging.info('AbsentThreshold: {}'.format(args.absentThreshold))
 logging.info('Python version : {}'.format(sys.version))
 
 _pidfile = args.pidfile
-#_sockfile = args.socket
+_sockfile = args.socket
 _apikey = args.apikey
 
 BTCONTROLLER = args.device
@@ -479,11 +483,15 @@ HEARTBEAT = HeartbeatThread(jc)
 HEARTBEAT.start()
 
 # Démarre le serveur qui écoute les requests de jeedom
-#if os.path.exists(args.socket):
-#    os.unlink(args.socket)
-#server = socketserver.UnixStreamServer(args.socket, JeedomHandler)
+if args.socket != None and len(args.socket) > 0:
+    logging.info('Use Unix socket for Jeedom -> daemon communication')
+    if os.path.exists(args.socket):
+        os.unlink(args.socket)
+    server = socketserver.UnixStreamServer(args.socket, JeedomHandler)
+else:
+    logging.info('Use TCP socket for Jeedom -> daemon communication')
+    server = LocalTcpServer((args.sockethost, int(args.socketport)), JeedomHandler)
 
-server = LocalTcpServer((args.sockethost, int(args.socketport)), JeedomHandler)
 handlerThread = threading.Thread(target=server.serve_forever)
 handlerThread.start()
 

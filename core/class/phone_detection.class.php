@@ -21,16 +21,14 @@ class phone_detection extends eqLogic
     public static function callDaemons($action, $args = '') 
     {
         log::add('phone_detection', 'debug', 'callDaemons ' . print_r($action, true) . ' ' .print_r($args, true));
-        $query = [
+        $query = array(
            'action' => $action,
            'args' => $args,
            'apikey' => jeedom::getApiKey('phone_detection')
-        ];
+        );
 
         if (config::byKey('noLocal', 'phone_detection', 0) == 0){
-            //$sock = 'unix://' . jeedom::getTmpFolder('phone_detection') . '/daemon.sock';
-            $tcpport  = config::byKey('socketport', 'phone_detection', 55009);
-            $sock     = 'tcp://127.0.0.1:' . $tcpport; 
+            $sock = 'unix://' . jeedom::getTmpFolder('phone_detection') . '/daemon.sock';
             callDaemon($query, $sock);
         }
 
@@ -334,8 +332,7 @@ class phone_detection extends eqLogic
         $cmd .= ' --loglevel ' . log::convertLogLevel(log::getLogLevel('phone_detection'));
         $cmd .= ' --apikey ' . jeedom::getApiKey('phone_detection');
         $cmd .= ' --pidfile ' . jeedom::getTmpFolder('phone_detection') . '/phone_detectiond.pid';
-        $cmd .= ' --sockethost "127.0.0.1"';
-        $cmd .= ' --socketport ' . $tcpport; 
+        $cmd .= ' --socket ' . jeedom::getTmpFolder('phone_detection') . '/daemon.sock';
         $cmd .= ' --callback ' . $callback;
         $cmd .= ' --daemonname "local"';
         $cmd .= ' --interval ' . $interval;
