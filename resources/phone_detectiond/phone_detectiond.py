@@ -42,6 +42,7 @@ class Phone:
         self.humanName = ''
         self.isReachable = False
         self.lastStateDate = datetime.utcnow()
+        self.lastRefreshDate = datetime.utcnow()
         self.mustUpdate = False
 
     def setReachable(self):
@@ -141,7 +142,13 @@ class PhoneDetection:
                 if self.callback.setDeviceStatus(int(self.device.deviceId), self.device.isReachable):
                     self.device.lastStateDate = datetime.utcnow()
                     self.device.mustUpdate = False
-            
+            else:
+                refreshDate = self.device.lastRefreshDate + timedelta(seconds=300)
+                if datetime.utcnow() > refreshDate:
+                    logging.debug('{} forced refresh !'.format(int(self.device.deviceId)))
+                    self.device.lastRefreshDate = datetime.utcnow()
+                    self.callback.setDeviceStatus(int(self.device.deviceId), self.device.isReachable)
+
             if self.device.isReachable:
                 sleepTime = self.present_interval
             else:
@@ -180,15 +187,17 @@ class JeedomCallback:
     def __request(self, m):
         response = None
         m['source'] = self.daemonname;
-        logging.debug('Send to jeedom :  {}'.format(m))
-        r = requests.post('{}?apikey={}'.format(self.url, self.apikey), data=json.dumps(m), verify=False)
-        logging.debug('Status Code :  {}'.format(r.status_code))
-        if r.status_code != 200:
-            logging.error('Error on send request to jeedom, return code {} - {}'.format(r.status_code, r.reason))
-
-        else:
-            response = r.json()
-            logging.debug('Jeedom reply :  {}'.format(response))
+        for i in range (0,3):
+            logging.debug('Send to jeedom :  {}'.format(m))
+            r = requests.post('{}?apikey={}'.format(self.url, self.apikey), data=json.dumps(m), verify=False)
+            logging.debug('Status Code :  {}'.format(r.status_code))
+            if r.status_code != 200:
+                logging.error('Error on send request to jeedom, return code {} - {}'.format(r.status_code, r.reason))
+                sleep(0.150)
+            else:
+                response = r.json()
+                logging.debug('Jeedom reply :  {}'.format(response))
+                break
         return response
 
     def send(self, message):

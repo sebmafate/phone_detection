@@ -45,9 +45,13 @@ switch ($action) {
                         $statePropertyCmd->save();
                     }
                     log::add('phone_detection','debug', 'State property name: '. $statePropertyCmd->getHumanName());
-                    $eqLogic->checkAndUpdateCmd($statePropertyCmd,$value);
-                    $eqLogic->computePresence();
-                    phone_detection::updateGlobalDevice();
+		    $currentState = $statePropertyCmd->execCmd() == 1;
+		    if ($currentState != $value) {
+                        log::add('phone_detection','debug', 'Update value to . ' . $value . ' for ' . $statePropertyCmd->getHumanName());
+                        $eqLogic->checkAndUpdateCmd($statePropertyCmd,$value);
+                        $eqLogic->computePresence();
+                        phone_detection::updateGlobalDevice();
+		    }
                     break;
                 }
             }
