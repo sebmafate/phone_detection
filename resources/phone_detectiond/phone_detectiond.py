@@ -268,7 +268,6 @@ class JeedomCallback:
 Intercepte les demandes de Jeedom : update_device, insert_device et remove_device
 """
 class JeedomHandler(socketserver.BaseRequestHandler):
-    allow_reuse_address = True
 
     def handle(self):
         # self.request is the TCP socket connected to the client
@@ -375,13 +374,6 @@ class HeartbeatThread:
         while not self._stop:
             self.callback.heartbeat()
             time.sleep(sleepTime)
-
-
-"""
-class pour gerer le server TCP.
-"""
-class LocalTcpServer(socketserver.TCPServer):
-    allow_reuse_address = True
 
 
 """
@@ -499,7 +491,8 @@ if args.socket != None and len(args.socket) > 0:
     server = socketserver.UnixStreamServer(args.socket, JeedomHandler)
 else:
     logging.info('Use TCP socket for Jeedom -> daemon communication')
-    server = LocalTcpServer((args.sockethost, int(args.socketport)), JeedomHandler)
+    socketserver.TCPServer.allow_reuse_address = True
+    server = socketserver.TCPServer((args.sockethost, int(args.socketport)), JeedomHandler)
 
 handlerThread = threading.Thread(target=server.serve_forever)
 handlerThread.start()
