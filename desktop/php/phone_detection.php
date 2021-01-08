@@ -63,17 +63,6 @@ var deviceType = new Object();
           <span
               style="font-size : 1.1em;position:relative; top : 23px;word-break: break-all;white-space: pre-wrap;word-wrap: break-word;color:#767676">{{Configuration}}</span>
         </div>
-	<!-- bouton d'acces a la page Sante -->
-	<div class="cursor logoSecondary" id="bt_health_phone_detection">
-	    <i class="fas fa-medkit"></i>
-            <br/>
-            <span>{{Sante}}</span>
-	</div>
-        <div class="cursor logoSecondary" id="bt_remote_phone_detection">
-            <i class="fab fa-bluetooth"></i>
-        <br/>
-        <span>{{Antennes}}</span>
-    </div>
       </div>
       <!-- Début de la liste des objets -->
       <legend><i class="fa fa-table"></i> {{Mes objects}}</legend>
