@@ -38,12 +38,12 @@ function addCmdToTable(_cmd) {
 
 
 $('#bt_remote_phone_detection').on('click', function () {
-    $('#md_modal').dialog({title: "{{Gestion des antennes bluetooth}}"});
+    $('#md_modal').dialog({title: "{{Gestion des antennes Bluetooth}}"});
     $('#md_modal').load('index.php?v=d&plugin=phone_detection&modal=phone_detection.remote&id=phone_detection').dialog('open');
 });
 
 
 $('#bt_health_phone_detection').on('click', function () {
-    $('#md_modal').dialog({title: "{{Sante Detection des Telephones}}"});
+    $('#md_modal').dialog({title: "{{Santé Détection des Téléphones}}"});
     $('#md_modal').load('index.php?v=d&plugin=phone_detection&modal=phone_detection.health&id=phone_detection').dialog('open');
 });
