@@ -84,18 +84,6 @@ nfinie et dans tous les cas la roue restera le temps de maj des antennes}}"></i>
                 echo '</div>';
             }
         ?>
-       <div class="form-group">
-        <label class="col-sm-4 control-label">{{Port clef bluetooth}}</label>
-        <div class="col-sm-2">
-            <select class="configKey form-control" data-l1key="port">
-                <option value="none">{{Aucun}}</option>
-                <?php
-foreach (jeedom::getBluetoothMapping() as $name => $value) {
-    echo '<option value="' . $name . '">' . $name . ' (' . $value . ')</option>';
-}
-?>
-           </select>
-       </div>
    </div>
 </fieldset>
 <fieldset>

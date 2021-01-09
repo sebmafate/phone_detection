@@ -193,7 +193,7 @@ class JeedomCallback:
             logging.debug('Status Code :  {}'.format(r.status_code))
             if r.status_code != 200:
                 logging.error('Error on send request to jeedom, return code {} - {}'.format(r.status_code, r.reason))
-                sleep(0.150)
+                time.sleep(0.150)
             else:
                 response = r.json()
                 logging.debug('Jeedom reply :  {}'.format(response))

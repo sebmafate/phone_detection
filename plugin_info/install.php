@@ -12,9 +12,15 @@ function phone_detection_install() {
 }
 
 function phone_detection_update() {
-    log::add('phone_detection', 'debug', 'Phone_detection_update');
-    $daemonInfo = phone_detection::deamon_info();
+    log::add('phone_detection', 'debug', 'phone_detection_update');
+    $sql = file_get_contents(dirname(__FILE__) . '/install.sql');
+    DB::Prepare($sql, array(), DB::FETCH_TYPE_ROW);
+    foreach (phone_detection::byType('phone_detection') as $phone_detection) {
+        $phone_detection->save();
+    
+    message::add('phone_detection','Pensez a mettre a jour vos antennes et relancer leurs dépendances si besoin ...');
 
+    $daemonInfo = phone_detection::deamon_info();
     if ($daemonInfo['state'] == 'ok') {
         phone_detection::deamon_stop();
     }
@@ -23,13 +29,6 @@ function phone_detection_update() {
     $cache->remove();
 
 
-    $sql = file_get_contents(dirname(__FILE__) . '/install.sql');
-    DB::Prepare($sql, array(), DB::FETCH_TYPE_ROW);
-    foreach (phone_detection::byType('phone_detection') as $phone_detection) {
-        $phone_detection->save();
-    }
-    message::add('phone_detection','Pensez �|  mettre �|  jour vos antennes et relancer leurs dépendances si besoin ...'))
-;
     config::save('version',phone_detection::$_version,'phone_detection');
     if (config::byKey('allowUpdateAntennas','phone_detection',0) == 1) {
         log::add('phone_detection','info','Mise a jour des fichiers de toutes les antennes');
@@ -39,7 +38,7 @@ function phone_detection_update() {
     phone_detection::dependancy_install();
 
     message::removeAll('Phone_detection');
-    message::add('Phone_detection', '{{Mise à jour du plugin Phone_detection terminée, vous êtes en version }}' . phone_detection::getVersion() . '.', null, null);
+    message::add('Phone_detection', '{{Mise a jour du plugin Phone_detection terminée, vous êtes en version }}' . phone_detection::getVersion() . '.', null, null);
 
     phone_detection::deamon_start();
 
