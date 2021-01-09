@@ -60,7 +60,7 @@ foreach ($eqLogics as $eqLogic) {
 		$antennaState = $statecmd->execCmd();
 		$antennaName   = 'local';
 	        if ($antennaState == 1) {
-	            $states = $states . '<span class="label label-success" style="font-size : 0.9em;cursor:default;padding:0px 5px;">{{Present}}} (' . ucfirst($antennaName) .')</span></br>';
+	            $states = $states . '<span class="label label-success" style="font-size : 0.9em;cursor:default;padding:0px 5px;">{{Present}} (' . ucfirst($antennaName) .')</span></br>';
 	        } else {
 	            $states = $states . '<span class="label" style="font-size : 0.9em;cursor:default;padding:0px 5px;background-color:#cccc00">{{Absent}} (' . ucfirst($antennaName) .')</span></br>';
 		}
