@@ -17,6 +17,7 @@ function phone_detection_update() {
     DB::Prepare($sql, array(), DB::FETCH_TYPE_ROW);
     foreach (phone_detection::byType('phone_detection') as $phone_detection) {
         $phone_detection->save();
+    }
     
     message::add('phone_detection','Pensez a mettre a jour vos antennes et relancer leurs dépendances si besoin ...');
 
