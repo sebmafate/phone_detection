@@ -13,7 +13,7 @@ $action   = $results['action'];
 $value    = 0;
 $antennas = phone_detection_remote::getCacheRemotes('allremotes',array());
 if (config::byKey('noLocal', 'phone_detection', 0) == 0){
-    $local = array(id=>0,remoteName>='local',configuration=>array());
+    $local = array('id'=>0,'remoteName'=>'local','configuration'=>array());
     array_push($antennas, $local);
 }
 
