@@ -473,22 +473,15 @@ class phone_detection extends eqLogic
         $remotes = phone_detection_remote::getCacheRemotes('allremotes',array());
         $availremote= array();
         foreach ($remotes as $remote) {
-            $availremote[] = $remote->getRemoteName();
-            self::getRemoteLog($remote->getId());
+	    if (method_exists($remote, 'getRemoteName')) {
+                $availremote[] = $remote->getRemoteName();
+                self::getRemoteLog($remote->getId());
+	    }
         }
         foreach (eqLogic::byType('phone_detection') as $eqLogic){
             foreach ($eqLogic->getCmd('info') as $cmd) {
                 $logicalId = $cmd->getLogicalId();
-                /*if (substr($logicalId,0,4) == 'rssi'){
-                    $remotename= substr($logicalId,4);
-                    if ($remotename != 'local' && $remotename != 'local' && !(in_array($remotename,$availremote))){
-                        $cmd->remove();
-                    } else if ($remotename == 'local') {
-                        if (config::byKey('noLocal', 'phone_detection', 0) == 1){
-                            $cmd->remove();
-                        }
-                    }
-                } else*/ if (substr($logicalId,0,6) == 'state_' && $logicalId != 'state') {
+                if (substr($logicalId,0,6) == 'state_') {
                     $remotename= substr($logicalId,6);
                     if ($remotename != 'local' && !(in_array($remotename,$availremote))){
                         $cmd->remove();
