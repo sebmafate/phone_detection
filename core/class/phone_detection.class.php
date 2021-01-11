@@ -29,7 +29,7 @@ class phone_detection extends eqLogic
 
         if (config::byKey('noLocal', 'phone_detection', 0) == 0){
             $sock = 'unix://' . jeedom::getTmpFolder('phone_detection') . '/daemon.sock';
-            callDaemon($query, $sock);
+	    phone_detection::callDaemon($query, $sock);
         }
 
         $remotes = phone_detection_remote::getCacheRemotes('allremotes',array());
