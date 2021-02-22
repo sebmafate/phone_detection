@@ -7,18 +7,18 @@ class phone_detection extends eqLogic
 {
 
     /*************** Attributs ***************/
-    
+
 
     /************* Static methods ************/
 
 
-    /** 
+    /**
      * Call the python daemon, local and remotes
      * @param  string $action Action calling.
      * @param  string $args   Other arguments.
      * @return array  Result of the callZiGate.
      */
-    public static function callDaemons($action, $args = '') 
+    public static function callDaemons($action, $args = '')
     {
         log::add('phone_detection', 'debug', 'callDaemons ' . print_r($action, true) . ' ' .print_r($args, true));
         $query = array(
@@ -62,7 +62,7 @@ class phone_detection extends eqLogic
 		        if ($info['timed_out']) {
                             log::add('phone_detection', 'info', 'timeout in callDaemon('.$sock.') '.print_r($result, true));
 			    $result = '';
-		        } 
+		        }
                     }
 	        }
             } catch( Exception $ex) {
@@ -83,7 +83,7 @@ class phone_detection extends eqLogic
         $deviceCount = 0;
         // $values["count"] = count($devices);
         // $values["devices"] = $devices;
-        
+
         foreach($devices as $d) {
             if ($d->getConfiguration('deviceType') != 'phone') {
                 continue;
@@ -244,11 +244,11 @@ class phone_detection extends eqLogic
      */
     public static function deamon_info()
     {
-        $return = array(); 
+        $return = array();
         $return['log'] = 'phone_detection';
         $return['state'] = 'nok';
         if (config::byKey('noLocal', 'phone_detection', 0) == 1){
-            $return['state'] = 'ok'; 
+            $return['state'] = 'ok';
             $return['launchable'] = 'ok';
             return $return;
         }
@@ -261,7 +261,7 @@ class phone_detection extends eqLogic
             }
         }
         $return['launchable'] = 'ok';
-        
+
         $btport = config::byKey('btport', 'phone_detection');
         $interval = config::byKey('interval', 'phone_detection', 10);
         $present_interval = config::byKey('present_interval', 'phone_detection', 30);
@@ -274,7 +274,7 @@ class phone_detection extends eqLogic
             $return['launchable'] = 'nok';
             $return['launchable_message'] = __('Veuillez (ré-)installer les dépendances', __FILE__);
             return $return;
-        } 
+        }
 
         if ($btport == "none" || $btport == "" || empty($btport)) {
             $return['launchable'] = 'nok';
@@ -338,7 +338,7 @@ class phone_detection extends eqLogic
         $cmd .= ' --interval ' . $interval;
         $cmd .= ' --present_interval ' . $present_interval;
         $cmd .= ' --absentThreshold ' . $absentThreshold;
-        
+
         log::add('phone_detection', 'info', 'Lancement démon phone_detection : ' . $cmd);
         exec($cmd . ' >> ' . log::getPathToLog('phone_detection') . ' 2>&1 &');
         $i = 0;
@@ -403,7 +403,7 @@ class phone_detection extends eqLogic
     }
 
     public static function health() {
-        $return = array(); 
+        $return = array();
         $remotes = phone_detection_remote::getCacheRemotes('allremotes',array());
         if (count($remotes) !=0){
             $return[] = array(
@@ -530,10 +530,10 @@ class phone_detection extends eqLogic
         }
         foreach ($this->getCmd('info') as $cmd) {
             if (substr($cmd->getLogicalId(),0,6) == 'state_' && $cmd->getLogicalId() != 'state'){
-                $globalPresence += $cmd->execCmd();
+                $globalState += $cmd->execCmd();
             }
         }
-        if ($globalPresence > 0) {
+        if ($globalState > 0) {
             $this->checkAndUpdateCmd($stateCmd, 1);
         } else {
             $this->checkAndUpdateCmd($stateCmd, 0);
@@ -602,7 +602,7 @@ class phone_detection extends eqLogic
     public function preRemove() {
         log::add('phone_detection', 'debug', 'preRemove()');
         if( $this->getConfiguration('deviceType') == 'phone') {
-            phone_detection::callDaemons('remove_device', 
+            phone_detection::callDaemons('remove_device',
                 [
                     $this->getId(),
                     $this->getName(),
@@ -666,7 +666,7 @@ class phone_detection extends eqLogic
             }
 
             if ($this->getIsEnable()) {
-                phone_detection::callDaemons('update_device', 
+                phone_detection::callDaemons('update_device',
                     [
                         $this->getId(),
                         $this->getName(),
@@ -674,7 +674,7 @@ class phone_detection extends eqLogic
                     ]
                 );
             } else {
-                phone_detection::callDaemons('remove_device', 
+                phone_detection::callDaemons('remove_device',
                 [
                     $this->getId(),
                     $this->getName(),
@@ -831,7 +831,7 @@ class phone_detectionCmd extends cmd
                 // On récupère la mac address de l'équipement
                 $macAddress = $phone_detectionObj->getConfiguration('macAddress');
                     log::add('phone_detection','debug', 'mac address: '.$macAddress);
-            
+
                 // On ping le device pour savoir s'il est là
                 $btController = config::byKey('btport', 'phone_detection');
 
@@ -839,7 +839,7 @@ class phone_detectionCmd extends cmd
                 log::add('phone_detection','info', 'BT Device: '.$btController);
 
                 $btController = ( $btController == '' ? 'hci0' : $btController );
-                
+
                 $name = shell_exec("sudo hcitool -i ". $btController ." name " . $macAddress);
                 log::add('phone_detection', 'debug', 'device name: '. $name);
 
