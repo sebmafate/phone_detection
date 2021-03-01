@@ -68,7 +68,7 @@ class Phone:
             logging.info('Set "{}" phone absent'.format(self.humanName))
             self.mustUpdate = True
             return True
-        
+
         self.mustUpdate = False
         return False
 
@@ -112,26 +112,40 @@ class PhoneDetection:
         self.t = threading.Thread(target=self.__run)
         self.t.daemon = True
         self.t.start()
-    
+
     def stop(self, waitForStop = True):
         logging.info('Stop thread detection for {} [{}]'.format(self.device.humanName, self.device.macAddress))
         self._stop = True
         if waitForStop:
             self.t.join()
-            del self.t 
+            del self.t
             gc.collect()
-    
+
     def GetPhoneInformation(self):
-        logging.debug('Get phone information {}'.format(self.device.deviceId))
-        result = subprocess.run(['sudo', 'hcitool', '-i', self.btController, 'name', self.device.macAddress], stdout = subprocess.PIPE)
-        if result.stdout:
-            logging.debug('{} is present'.format(self.device.deviceId))
-            self.device.setReachable()
-        else:
-            logging.debug('{} is absent'.format(self.device.deviceId))
-            self.device.setNotReachable()
-        
-        logging.debug('{} {}'.format(self.device.deviceId, ("is up to date", "must be update")[self.device.mustUpdate]))
+        try:
+            logging.debug('Get phone information {}'.format(self.device.deviceId))
+            result = subprocess.run(['sudo', 'hcitool', '-i', self.btController, 'name', self.device.macAddress], stdout = subprocess.PIPE)
+            # check_returncode will generate a CallProcessError exception if return_code is not 0.
+            result.check_returncode()
+            if result.stdout:
+                logging.debug('{} is present'.format(self.device.deviceId))
+                self.device.setReachable()
+            else:
+                logging.debug('{} is absent'.format(self.device.deviceId))
+                self.device.setNotReachable()
+
+            logging.debug('{} {}'.format(self.device.deviceId, ("is up to date", "must be update")[self.device.mustUpdate]))
+        except CallProcessError as e:
+            logging.info('Error {} ({}) while processing mobile {} [{}]'.format(e.returncode, e.stderr, self.device.humanName, self.device.macAddress))
+            # retry at next round
+        except TimeoutExpired as e:
+            logging.info('Timeout after {} seconds while processing mobile {} [{}]'.format(e.timeout, self.device.humanName, self.device.macAddress))
+            # retry at next round
+        except Exception as e:
+            logging.info('Unknow exception {} while processing mobile {} [{}]'.format(e.message, self.device.humanName, self.device.macAddress))
+            # retry at next round
+
+
 
     def __run(self):
         sleepTime = self.interval
@@ -153,7 +167,7 @@ class PhoneDetection:
                 sleepTime = self.present_interval
             else:
                 sleepTime = self.interval
-            
+
             time.sleep(sleepTime)
 
 """
@@ -236,7 +250,7 @@ class JeedomCallback:
             logging.error('Error during update status')
             return False
         return True
-    
+
     def updateGlobalDevice(self):
         r = self.__send_now({'action': 'refresh_group'})
         if not r or not r.get('success'):
@@ -262,7 +276,7 @@ class JeedomCallback:
                 r[key].lastStateDate = datetime.strptime(item['lastValueDate'], DATEFORMAT)
             except:
                 r[key].lastStateDate = datetime.utcnow()
-        return r      
+        return r
 
 """
 Intercepte les demandes de Jeedom : update_device, insert_device et remove_device
@@ -306,7 +320,7 @@ class JeedomHandler(socketserver.BaseRequestHandler):
                 THREADS[mid] = PhoneDetection(DEVICES[mid], BTCONTROLLER, INTERVAL, PRESENTINTERVAL, jc)
                 response['result'] = 'Insert OK'
                 THREADS[mid].start()
-        
+
         if action == 'remove_device':
             mid = args[0]
             if mid in DEVICES:
@@ -342,8 +356,8 @@ class JeedomHandler(socketserver.BaseRequestHandler):
         self.request.sendall(json.dumps(response, cls=PhoneEncoder).encode())
 
         if stop == True:
-            os.kill(os.getpid(),signal.SIGTERM) 
-             
+            os.kill(os.getpid(),signal.SIGTERM)
+
 
 
 """
@@ -360,15 +374,15 @@ class HeartbeatThread:
         self.t = threading.Thread(target=self.__run)
         self.t.daemon = True
         self.t.start()
-    
+
     def stop(self, waitForStop = True):
         logging.info('Stop heartbeat thread')
         self._stop = True
         if waitForStop:
             self.t.join()
-            del self.t 
+            del self.t
             gc.collect()
-    
+
     def __run(self):
         sleepTime = 30
         while not self._stop:
@@ -377,7 +391,7 @@ class HeartbeatThread:
 
 
 """
-Converti le loglevel envoyer par jeedom 
+Converti le loglevel envoyer par jeedom
 """
 def convert_log_level(level='error'):
     LEVELS = {'debug': logging.DEBUG,
@@ -386,7 +400,7 @@ def convert_log_level(level='error'):
               'warning': logging.WARNING,
               'error': logging.ERROR,
               'critical': logging.CRITICAL,
-              'none': logging.NOTSET, 
+              'none': logging.NOTSET,
               'default': logging.INFO }
     return LEVELS.get(level, logging.NOTSET)
 
@@ -406,7 +420,7 @@ def shutdown():
         THREADS[key].stop(False)
     HEARTBEAT.stop(False)
     logging.info("Shutting down local server")
-    server.shutdown() 
+    server.shutdown()
     server.server_close()
     if (_sockfile != None and len(str(_sockfile)) > 0):
         logging.info("Removing Socket file " + str(_sockfile))
@@ -508,4 +522,3 @@ THREADS = {}
 for key in DEVICES:
     THREADS[key] = PhoneDetection(DEVICES[key], args.device, INTERVAL, PRESENTINTERVAL, jc)
     THREADS[key].start()
-
