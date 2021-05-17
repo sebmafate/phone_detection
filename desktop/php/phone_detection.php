@@ -1,4 +1,6 @@
 <?php
+global $jeedom_theme;
+
 if (!isConnect('admin')) {
 	throw new Exception('{{401 - Accès non autorisé}}');
 }
@@ -51,13 +53,18 @@ $eqLogics = eqLogic::byType($plugin->getId());
 			echo '</div>';
 			// Liste des équipements du plugin
 			echo '<div class="eqLogicThumbnailContainer">';
+			if ( substr($jeedom_theme['currentTheme'], -5) == '_Dark') {
+				$iconColor = 'white';
+			} else {
+				$iconColor = 'black';
+			}
 			foreach ($eqLogics as $eqLogic) {
 				$opacity = ($eqLogic->getIsEnable()) ? '' : 'disableCard';
                 echo '<div class="eqLogicDisplayCard cursor '.$opacity.'" data-eqLogic_id="' . $eqLogic->getId() . '">';
                 if ($eqLogic->getConfiguration('deviceType') == 'phone') {
-	            	echo '<img src="/plugins/phone_detection/desktop/images/black_single_phone.png" style="height:60px !important; width: auto !important; max-height:auto !important;min-height:auto !important;" />';
-                } else {
-					echo '<img src="/plugins/phone_detection/desktop/images/black_phone_group.png" style="height:60px !important; width: auto !important; max-height:auto !important;min-height:auto !important;" />';
+					echo '<img src="/plugins/phone_detection/desktop/images/' . $iconColor . '_single_phone.png" style="height:60px !important; width: auto !important; max-height:auto !important;min-height:auto !important;" />';
+             	} else {
+					echo '<img src="/plugins/phone_detection/desktop/images/' . $iconColor . '_phone_group.png" style="height:60px !important; width: auto !important; max-height:auto !important;min-height:auto !important;" />';
 				}
 				echo '<br>';
 				echo '<span class="name">' . $eqLogic->getHumanName(true, true) . '</span>';
