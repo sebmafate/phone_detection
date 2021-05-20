@@ -40,7 +40,7 @@ function getBTControllers()
        </div>
     </div>
     <div class="form-group">
-        <label class="col-lg-4 control-label">{{Autoriser la mise a jour des fichiers des antennes automatiquement lors d'une mise a jour}} <sup><i class="fas fa-question-circle" title="{{Très pratique, mais attention si vos antennes ont des soucis au moment de la maj, alors il peut y avoir une roue crantée ii
+        <label class="col-lg-4 control-label">{{Autoriser la mise a jour des fichiers des antennes automatiquement lors d'une mise a jour}} <sup><i class="fas fa-question-circle" title="{{Très pratique, mais attention si vos antennes ont des soucis au moment de la maj, alors il peut y avoir une roue crantée i
 nfinie et dans tous les cas la roue restera le temps de maj des antennes}}"></i></sup></label>
         <div class="col-lg-3">
            <input type="checkbox" class="configKey" data-l1key="allowUpdateAntennas" />
@@ -61,9 +61,9 @@ nfinie et dans tous les cas la roue restera le temps de maj des antennes}}"></i>
     <br/>
     <label class="col-lg-4"></label>
     <div class="col-lg-8">
-        <a class="btn btn-warning allantennas" data-action="update"><i class="fas fa-arrow-up"></i> {{Mettre a jour les fichiers sur toutes les antennes}}</a>
+        <a class="btn btn-warning allantennas" data-action="update"><i class="fas fa-arrow-up"></i> {{Mettre à jour les fichiers sur toutes les antennes}}</a>
         <a class="btn btn-success allantennas" data-action="restart"><i class="fas fa-play"></i> {{Redémarrer toutes les antennes}}</a>
-        <a class="btn btn-warning allantennas" data-action="updatedep"><i class="fas fa-arrow-up"></i> {{Mettre a jour les dépendances sur toutes lesantennes}}</a>
+        <a class="btn btn-warning allantennas" data-action="updatedep"><i class="fas fa-arrow-up"></i> {{Mettre à jour les dépendances sur toutes les antennes}}</a>
         <a class="btn btn-danger allantennas" data-action="stop"><i class="fas fa-stop"></i> {{Arrêter toutes les antennes}}</a>
     </div>
     </div>
@@ -106,7 +106,7 @@ nfinie et dans tous les cas la roue restera le temps de maj des antennes}}"></i>
     <fieldset>
     <div class="form-group">
       <label class="col-sm-4 control-label">
-        {{ Intervalle de mise a jour quand le téléphone est absent }} <sup><i class="fa fa-question-circle tooltips" title="{{C'est le temps en secondes entre 2 tentatives de ping du téléphone quand le téléphone est absent}}" style="font-size : 1em;color:grey;"></i></sup>
+        {{ Intervalle de mise à jour quand le téléphone est absent }} <sup><i class="fa fa-question-circle tooltips" title="{{C'est le temps en secondes entre 2 tentatives de ping du téléphone quand le téléphone est absent}}" style="font-size : 1em;color:grey;"></i></sup>
       </label>
       <div class="col-sm-1">
         <input type="text" class="configKey form-control" data-l1key="interval" placeholder="10"/>
@@ -115,7 +115,7 @@ nfinie et dans tous les cas la roue restera le temps de maj des antennes}}"></i>
     <fieldset>
     <div class="form-group">
       <label class="col-sm-4 control-label">
-        {{ Intervalle de mise a jour quand le téléphone est présent }} <sup><i class="fa fa-question-circle tooltips" title="{{C'est le temps en secondes entre 2 tentatives de ping du téléphone quand le téléphone est présent}}" style="font-size : 1em;color:grey;"></i></sup>
+        {{ Intervalle de mise à jour quand le téléphone est présent }} <sup><i class="fa fa-question-circle tooltips" title="{{C'est le temps en secondes entre 2 tentatives de ping du téléphone quand le téléphone est présent}}" style="font-size : 1em;color:grey;"></i></sup>
       </label>
       <div class="col-sm-1">
         <input type="text" class="configKey form-control" data-l1key="present_interval" placeholder="30"/>
