@@ -11,7 +11,7 @@
   "documentation": "https://github.com/sebmafate/phone_detection",
   "changelog": "https://github.com/sebmafate/phone_detection",
   "description": "Ping à intervals réguliers un téléphone pour en déterminer sa présence",
-  "author": "Sébastien Ferrand",
+  "author": "Sébastien Ferrand, benoit5672 (multi antennes)",
   "language": ["fr_FR", "en_US"],
-	"compatibility": ["miniplus", "smart", "rpi", "docker", "diy"]
+	"compatibility": ["miniplus", "smart", "rpi", "docker", "diy", "rpi4"]
 }
