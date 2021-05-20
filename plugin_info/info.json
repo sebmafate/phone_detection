@@ -8,7 +8,7 @@
   "hasDependency": true,
   "hasOwnDeamon": true,
   "maxDependancyInstallTime": 0,
-  "documentation": "https://github.com/sebmafate/phone_detection",
+  "documentation": "Merci à benoit5672 pour la version multi-antennes<br>https://github.com/sebmafate/phone_detection",
   "changelog": "https://github.com/sebmafate/phone_detection",
   "description": "Ping à intervals réguliers un téléphone pour en déterminer sa présence",
   "author": "Sébastien Ferrand, benoit5672 (multi antennes)",
