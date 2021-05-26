@@ -212,4 +212,3 @@ function phone_detection_postSaveConfiguration(){
   });
 }
 </script>
-

@@ -53,18 +53,13 @@ $eqLogics = eqLogic::byType($plugin->getId());
 			echo '</div>';
 			// Liste des équipements du plugin
 			echo '<div class="eqLogicThumbnailContainer">';
-			if ( substr($jeedom_theme['currentTheme'], -5) == '_Dark') {
-				$iconColor = 'white';
-			} else {
-				$iconColor = 'black';
-			}
 			foreach ($eqLogics as $eqLogic) {
 				$opacity = ($eqLogic->getIsEnable()) ? '' : 'disableCard';
                 echo '<div class="eqLogicDisplayCard cursor '.$opacity.'" data-eqLogic_id="' . $eqLogic->getId() . '">';
                 if ($eqLogic->getConfiguration('deviceType') == 'phone') {
-					echo '<img src="/plugins/phone_detection/desktop/images/' . $iconColor . '_single_phone.png" style="height:60px !important; width: auto !important; max-height:auto !important;min-height:auto !important;" />';
+					echo '<img class="single-phone" src="/plugins/phone_detection/desktop/images/black_single_phone.png" style="height:60px !important; width: auto !important; max-height:auto !important; min-height:auto !important;"/>';
              	} else {
-					echo '<img src="/plugins/phone_detection/desktop/images/' . $iconColor . '_phone_group.png" style="height:60px !important; width: auto !important; max-height:auto !important;min-height:auto !important;" />';
+					echo '<img class="phone-group" src="/plugins/phone_detection/desktop/images/black_phone_group.png" style="height:60px !important; width: auto !important; max-height:auto !important; min-height:auto !important;"/>';
 				}
 				echo '<br>';
 				echo '<span class="name">' . $eqLogic->getHumanName(true, true) . '</span>';
@@ -184,6 +179,7 @@ $eqLogics = eqLogic::byType($plugin->getId());
 </div><!-- /.row row-overflow -->
 
 <!-- Inclusion du fichier javascript du plugin (dossier, nom_du_fichier, extension_du_fichier, id_du_plugin) -->
+<?php include_file('desktop', 'phone_detection', 'css', 'phone_detection');?>
 <?php include_file('desktop', 'phone_detection', 'js', 'phone_detection');?>
 <!-- Inclusion du fichier javascript du core - NE PAS MODIFIER NI SUPPRIMER -->
 <?php include_file('core', 'plugin.template', 'js');?>

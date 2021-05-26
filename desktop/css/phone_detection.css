@@ -1,9 +1,44 @@
-.eqLogicThumbnailContainer .eqLogicAction,
-.eqLogicThumbnailContainer .eqLogicDisplayCard {
-    text-align: center;
+[data-theme="core2019_Dark"] .eqLogicThumbnailContainer .eqLogicDisplayCard > img.single-phone {
+    content:url("/plugins/phone_detection/desktop/images/white_single_phone.png") !important;
+    height:60px !important;
+    width: auto !important;
+    max-height:auto !important;
+    min-height:auto !important;
+}
+[data-theme="core2019_Light"] .eqLogicThumbnailContainer .eqLogicDisplayCard > img.single-phone {
+    content:url("/plugins/phone_detection/desktop/images/black_single_phone.png") !important;
+    height:60px !important;
+    width: auto !important;
+    max-height:auto !important;
+    min-height:auto !important;
+}
+[data-theme="core2019_Legacy"] .eqLogicThumbnailContainer .eqLogicDisplayCard > img.single-phone {
+    content:url("/plugins/phone_detection/desktop/images/black_single_phone.png") !important;
+    height:60px !important;
+    width: auto !important;
+    max-height:auto !important;
+    min-height:auto !important;
 }
 
-.eqLogicThumbnailContainer .eqLogicAction span,
-.eqLogicThumbnailContainer .eqLogicDisplayCard span {
-    display: block;
+
+[data-theme="core2019_Dark"] .eqLogicThumbnailContainer .eqLogicDisplayCard > img.phone-group {
+    content:url("/plugins/phone_detection/desktop/images/white_phone_group.png") !important;
+    height:60px !important;
+    width: auto !important;
+    max-height:auto !important;
+    min-height:auto !important;
+}
+[data-theme="core2019_Light"] .eqLogicThumbnailContainer .eqLogicDisplayCard > img.phone-group {
+    content:url("/plugins/phone_detection/desktop/images/black_phone_group.png") !important;
+    height:60px !important;
+    width: auto !important;
+    max-height:auto !important;
+    min-height:auto !important;
+}
+[data-theme="core2019_Legacy"] .eqLogicThumbnailContainer .eqLogicDisplayCard > img.phone-group {
+    content:url("/plugins/phone_detection/desktop/images/black_phone_group.png") !important;
+    height:60px !important;
+    width: auto !important;
+    max-height:auto !important;
+    min-height:auto !important;
 }
