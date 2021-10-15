@@ -1,0 +1,19 @@
+{
+  "logger": {
+    "title": "Remote Sync"
+  },
+  "uploadOnSave": true,
+  "useAtomicWrites": false,
+  "deleteLocal": false,
+  "ignore": [
+    ".remote-sync.json",
+    ".git/**"
+  ],
+  "watch": [],
+  "transport": "scp",
+  "port": "22",
+  "hostname": "172.24.1.13",
+  "target": "/var/www/html/plugins/phone_detection/",
+  "username": "benoit",
+  "password": "KWxryI08Y6PKR7Yg"
+}

@@ -1,3 +1,4 @@
+
 #!/bin/bash
 PROGRESS_FILE=/tmp/jeedom/phone_detection/dependance
 if [ ! -z $1 ]; then
