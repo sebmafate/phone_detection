@@ -14,11 +14,11 @@ Jeedom permet d'installer facilement un plugin :
 Pour cela dans le gestionnaire de plugins, cliquez sur le bouton "Market"
 ![Add plugins](images/add_plugin.png)
 
-Dans la fenêtre qui s'ouvre renseignez comme suit les informations :
+Dans la fenêtre qui s'ouvre, renseignez comme suit les informations :
 ![](images/add_plugin_github.jpg)
 
 ### b. Installation via le code source
-Il est aussi possible d'installer en utilisant le code source. Attention, cette manipulation est réservée à un public plutôt averti, vous pouvez en effet rendre votre Jeedom instable. Le code est equivalent a installer la version 'beta' du plugin via le market.
+Il est aussi possible d'installer en utilisant le code source. Attention, cette manipulation est réservée à un public plutôt averti, vous pouvez en effet rendre votre Jeedom instable.
 
 - Dans une console (en ssh ou en local), rendez vous dans le répertoire /var/www/html/plugins
 - Exécutez la commande suivante : `git clone https://github.com/sebmafate/phone_detection/ --branch develop`
@@ -32,7 +32,7 @@ Il est aussi possible d'installer en utilisant le code source. Attention, cette 
 
 Allez dans l'écran "Plugins > Sécurité > Détection de téléphone (Bluetooth)" :
 - Ajoutez un téléphone en cliquant sur le bouton +
-- Puis donnez un nom à votre équipement et renseignez l'adresse MAC de la puce puce Bluetooth de votre téléphone
+- Puis donnez un nom à votre équipement et renseignez l'adresse MAC de la puce Bluetooth de votre téléphone
 - Enregistrez
 - Patientez quelques secondes et le statut de votre téléphone est mis à jour !
 
