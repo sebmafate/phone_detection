@@ -29,7 +29,7 @@ class phone_detection extends eqLogic
 
         if (config::byKey('noLocal', 'phone_detection', 0) == 0){
             $sock = 'unix://' . jeedom::getTmpFolder('phone_detection') . '/daemon.sock';
-	    phone_detection::callDaemon($query, $sock);
+	        phone_detection::callDaemon($query, $sock);
         }
 
         $remotes = phone_detection_remote::getCacheRemotes('allremotes',array());
@@ -54,7 +54,7 @@ class phone_detection extends eqLogic
 
         if ($fp) {
             try {
-		stream_set_timeout($fp, 5);
+		        stream_set_timeout($fp, 5);
                 if (false !== fwrite($fp, json_encode($query))) {
                     while (!feof($fp)) {
                         $result .= fgets($fp, 1024);
@@ -77,7 +77,6 @@ class phone_detection extends eqLogic
     }
 
     public static function updateGlobalDevice() {
-        log::add('phone_detection', 'info', 'updateGlobalDevice()');
 
         $devices = eqLogic::byType("phone_detection", true);
         $deviceCount = 0;
@@ -88,22 +87,23 @@ class phone_detection extends eqLogic
             if ($d->getConfiguration('deviceType') != 'phone') {
                 continue;
             }
-
             $statePropertyCmd = $d->getCmd('info', 'state');
-            $stateValue = $statePropertyCmd->execCmd();
+            $stateValue       = $statePropertyCmd->execCmd();
+            log::add('phone_detection', 'debug', $d->getHumanName() . '-->' . $stateValue);
             $deviceCount += $stateValue;
         }
 
         $globalDevice = self::byLogicalId('GlobalGroup', 'phone_detection');
         $stateCmd = $globalDevice->getCmd('info', 'state');
-        $globalDevice->checkAndUpdateCmd($stateCmd, ($deviceCount > 0 ? 1 : 0));
-        //$stateCmd->event($deviceCount > 0 ? 1 : 0);
+        $newState = ($deviceCount > 0 ? 1 : 0);
+        $globalDevice->checkAndUpdateCmd($stateCmd, $newState);
         $stateCmd->save();
 
         $deviceCountCmd = $globalDevice->getCmd('info', 'count');
         $globalDevice->checkAndUpdateCmd($deviceCountCmd, $deviceCount);
         //$deviceCountCmd->event($deviceCount);
         $deviceCountCmd->save();
+        log::add('phone_detection', 'debug', 'updateGlobalDevice: state=' . $newState . '/nb1=' . $deviceCount . '/nbDevices=' .(count($devices) - 1));
     }
 
     //
@@ -450,6 +450,8 @@ class phone_detection extends eqLogic
                     $eqLogic->checkAndUpdateCmd($stateCmd, 0);
                     $eqLogic->computePresence();
                 }
+                // Update the global presence indicator
+                phone_detection::updateGlobalDevice();
                 if ($auto == 1){
                     log::add('phone_detection','info','Restarting daemon on remote ' . $remote->getRemoteName());
                     phone_detection::launchremote($remote->getId());
@@ -466,6 +468,8 @@ class phone_detection extends eqLogic
                 $eqLogic->checkAndUpdateCmd($stateCmd, 0);
                 $eqLogic->computePresence();
             }
+            // Update the globalPresence indicator
+            phone_detection::updateGlobalDevice();
         }
     }
 
@@ -508,6 +512,9 @@ class phone_detection extends eqLogic
 
 
     public function computePresence() {
+        if ($this->getConfiguration('deviceType') != 'phone') {
+            return;
+        }
         $globalState = 0;
         $stateCmd = $this->getCmd(null, 'state');
         if (!is_object($stateCmd)) {
