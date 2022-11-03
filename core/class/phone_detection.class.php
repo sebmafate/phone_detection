@@ -135,7 +135,7 @@ class phone_detection extends eqLogic
         $local = dirname(__FILE__) . '/../../../../log/phone_detection_'.str_replace(' ','-',$name).$_dependancy;
         log::add('phone_detection','info','Suppression de la log ' . $local);
         exec('rm -f '. $local);
-        log::add('phone_detection','info',__('Recuperation de la log distante sur '.$name,__FILE__));
+        log::add('phone_detection','info',__('Récuperation de la log distante sur '.$name,__FILE__));
         if ($remoteObject->getFiles($local,'/tmp/phone_detection'.$_dependancy)) {
             $remoteObject->execCmd(['cat /dev/null > /tmp/phone_detection'.$_dependancy]);
             return true;
@@ -149,7 +149,7 @@ class phone_detection extends eqLogic
         log::add('phone_detection', 'debug', 'remote stopped');
         $remoteObject = phone_detection_remote::byId($_remoteId);
         $user = $remoteObject->getConfiguration('remoteUser');
-        log::add('phone_detection','info',__('Installation des dependances sur ' . $remoteObject->getRemoteName(),__FILE__));
+        log::add('phone_detection','info',__('Installation des dépendances sur ' . $remoteObject->getRemoteName(),__FILE__));
         return $remoteObject->execCmd(['bash /home/'.$user.'/phone_detectiond/resources/install_apt.sh /tmp/phone_detection_dependancy 2>&1 &']);
     }
 

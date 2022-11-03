@@ -6,6 +6,11 @@ lang: fr_FR
 
 # Changelog
 
+## 2022-01-03 v2.0.0
+* Utilisation de pybluez pour effectuer un appel python au lieu d'un appel système de hciconfig pour la demande d'information du mobile.
+  Il semble que cela solutionne les problèmes de blocage du daemon qui pouvait arriver sur raspberry.
+  Installation de hcidump qui permet de surveiller en temps reel les paquets envoyés et reçus par l'antenne bluetooth. Pour voir les paquets, il suffit d’exécuter la commande 'hcidump -t -X'
+
 ## 2021-05-26 v0.4.0
 * Ajout du support "multi-antennes" permettant d’étendre la couverture Bluetooth gérer par le plugin. Le multi-antennes utilisent le même principe que le plugin BLEA, en utilisant des équipements distantes possédant une clé Bluetooth et envoyant les informations au plugin phone_detection installe sur Jeedom.
 * Modification de l'interface 'configuration des équipements', pour être en phase avec le design 4.1 / 4.2. Cela comprend notamment la suppression du menu a gauche listant les équipements.

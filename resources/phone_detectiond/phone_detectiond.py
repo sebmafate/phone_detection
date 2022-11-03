@@ -20,6 +20,9 @@ import subprocess
 import collections
 import gc
 
+import bluetooth
+import bluetooth._bluetooth as _bt
+
 from multiprocessing.dummy import Pool as ThreadPool
 
 from datetime import date, datetime, timedelta
@@ -122,46 +125,40 @@ class PhoneDetection:
             gc.collect()
 
     def GetPhoneInformation(self):
+        logging.debug('Get phone information {}'.format(self.device.deviceId))
+        if not bluetooth.is_valid_address(self.device.macAddress):
+            raise Exception('Phone not monitored because invalid mac address')
+
+        sock = _bt.hci_open_dev(self.btController)
         try:
-            logging.debug('Get phone information {}'.format(self.device.deviceId))
-            result = subprocess.run(['sudo', 'hcitool', '-i', self.btController, 'name', self.device.macAddress], stdout = subprocess.PIPE)
-            # check_returncode will generate a CallProcessError exception if return_code is not 0.
-            result.check_returncode()
-            if result.stdout:
-                logging.debug('{} is present'.format(self.device.deviceId))
-                self.device.setReachable()
-            else:
-                logging.debug('{} is absent'.format(self.device.deviceId))
-                self.device.setNotReachable()
+            name = _bt.hci_read_remote_name (sock, self.device.macAddress, 5192)
+            logging.debug('{} is present'.format(self.device.deviceId))
+            self.device.setReachable()
+        except _bt.error as e:
+            logging.debug('bt error {}: {}'.format(e.args[0], e.args[1]))
+            logging.debug('{} is absent'.format(self.device.deviceId))
+            self.device.setNotReachable()
 
-            logging.debug('{} {}'.format(self.device.deviceId, ("is up to date", "must be update")[self.device.mustUpdate]))
-        except CallProcessError as e:
-            logging.info('Error {} ({}) while processing mobile {} [{}]'.format(e.returncode, e.stderr, self.device.humanName, self.device.macAddress))
-            # retry at next round
-        except TimeoutExpired as e:
-            logging.info('Timeout after {} seconds while processing mobile {} [{}]'.format(e.timeout, self.device.humanName, self.device.macAddress))
-            # retry at next round
-        except Exception as e:
-            logging.info('Unknow exception {} while processing mobile {} [{}]'.format(e.message, self.device.humanName, self.device.macAddress))
-            # retry at next round
-
-
+        sock.close()
 
     def __run(self):
         sleepTime = self.interval
         while not self._stop:
-            self.GetPhoneInformation()
-            if self.device.mustUpdate:
-                logging.debug('{} status has changed to \'{}\'! Notify Jeedom.'.format(self.device.humanName, ('absent','present')[self.device.isReachable]))
-                if self.callback.setDeviceStatus(int(self.device.deviceId), self.device.isReachable):
-                    self.device.lastStateDate = datetime.utcnow()
-                    self.device.mustUpdate = False
-            else:
-                refreshDate = self.device.lastRefreshDate + timedelta(seconds=300)
-                if datetime.utcnow() > refreshDate:
-                    logging.debug('{} forced refresh !'.format(int(self.device.deviceId)))
-                    self.device.lastRefreshDate = datetime.utcnow()
-                    self.callback.setDeviceStatus(int(self.device.deviceId), self.device.isReachable)
+            try:
+                self.GetPhoneInformation()
+                if self.device.mustUpdate:
+                    logging.debug('{} status has changed to \'{}\'! Notify Jeedom.'.format(self.device.humanName, ('absent','present')[self.device.isReachable]))
+                    if self.callback.setDeviceStatus(int(self.device.deviceId), self.device.isReachable):
+                        self.device.lastStateDate = datetime.utcnow()
+                        self.device.mustUpdate = False
+                else:
+                    refreshDate = self.device.lastRefreshDate + timedelta(seconds=300)
+                    if datetime.utcnow() > refreshDate:
+                        logging.debug('{} forced refresh !'.format(int(self.device.deviceId)))
+                        self.device.lastRefreshDate = datetime.utcnow()
+                        self.callback.setDeviceStatus(int(self.device.deviceId), self.device.isReachable)
+            except Exception as e:
+                logging.info('Unknow exception {} while processing mobile {} [{}]'.format(e, self.device.humanName, self.device.macAddress))
 
             if self.device.isReachable:
                 sleepTime = self.present_interval
@@ -188,14 +185,11 @@ class PhoneEncoder(json.JSONEncoder):
 Permet d'interroger Jeedom à partir du démon
 """
 class JeedomCallback:
-    def __init__(self, apikey, url, daemonname): # , sleeptime, present_sleeptime, btController
+    def __init__(self, apikey, url, daemonname):
         logging.info('Create {} daemon'.format(PLUGIN_NAME))
         self.apikey = apikey
         self.url = url
         self.daemonname = daemonname;
-        # self.sleeptime = sleeptime
-        # self.present_sleeptime = present_sleeptime
-        # self.btController = btController
         self.messages = []
 
     def __request(self, m):
@@ -473,7 +467,11 @@ _pidfile = args.pidfile
 _sockfile = args.socket
 _apikey = args.apikey
 
-BTCONTROLLER = args.device
+BTCONTROLLER = _bt.hci_devid(args.device)
+if BTCONTROLLER == -1:
+    logging.critical('Invalid bluetooth controller ' . args.device)
+    sys.exit(1)
+
 INTERVAL = int(args.interval)
 PRESENTINTERVAL = int(args.present_interval)
 
@@ -520,5 +518,5 @@ jc.updateGlobalDevice()
 THREADS = {}
 
 for key in DEVICES:
-    THREADS[key] = PhoneDetection(DEVICES[key], args.device, INTERVAL, PRESENTINTERVAL, jc)
+    THREADS[key] = PhoneDetection(DEVICES[key], BTCONTROLLER, INTERVAL, PRESENTINTERVAL, jc)
     THREADS[key].start()
