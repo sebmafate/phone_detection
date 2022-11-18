@@ -56,12 +56,12 @@ class phone_detection_remote {
 	}
 
 	public function getCache($_key = '', $_default = '') {
-		$cache = cache::byKey('eqLogicCacheAttr' . $this->getId())->getValue();
+		$cache = cache::byKey('PhoneDectionPluginRemote' . $this->getId())->getValue();
 		return utils::getJsonAttr($cache, $_key, $_default);
 	}
 
 	public function setCache($_key, $_value = null) {
-		cache::set('eqLogicCacheAttr' . $this->getId(), utils::setJsonAttr(cache::byKey('eqLogicCacheAttr' . $this->getId())->getValue(), $_key, $_value));
+		cache::set('PhoneDectionPluginRemote' . $this->getId(), utils::setJsonAttr(cache::byKey('PhoneDectionPluginRemote' . $this->getId())->getValue(), $_key, $_value));
 	}
 
 	public static function getCacheRemotes($_key = '', $_default = '') {
