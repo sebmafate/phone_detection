@@ -4,7 +4,7 @@ require_once dirname(__FILE__) . "/../../../../core/php/core.inc.php";
 require_once dirname(__FILE__) . "/../class/phone_detection_remote.class.php";
 
 if (!jeedom::apiAccess(init('apikey'), 'phone_detection')) {
-    echo __('Vous n\'êtes pas autorie a effectuer cette action', __FILE__);
+    echo __('Vous n\'êtes pas autorise a effectuer cette action', __FILE__);
     die();
 }
 
@@ -29,15 +29,15 @@ switch ($action) {
         log::add('phone_detection','debug', 'Device Name: '. $eqLogic->getHumanName());
         if ($eqLogic->getConfiguration('deviceType') == 'phone' && $eqLogic->getIsEnable()) {
             foreach ($antennas as $antenna){
-		if (method_exists($antenna, 'getRemoteName')) {
-		   $from = $antenna->getRemoteName();
-		} else {
-	           $from = 'local';
-		}
+                if (method_exists($antenna, 'getRemoteName')) {
+                    $from = $antenna->getRemoteName();
+                } else {
+                    $from = 'local';
+                }
                 if ($from == $results['source']){
-		    if (method_exists($antenna, 'setCache')) {
+                    if (method_exists($antenna, 'setCache')) {
                         $antenna->setCache('lastupdate', date("Y-m-d H:i:s"));
-		    }
+                    }
                     $statePropertyCmd = $eqLogic->getCmd(null, 'state_' . $results['source']);
                     if (!is_object($statePropertyCmd)) {
                         $statePropertyCmd = new phone_detectionCmd();
@@ -52,14 +52,11 @@ switch ($action) {
                         $statePropertyCmd->setEqLogic_id($eqLogic->getId());
                         $statePropertyCmd->save();
                     }
-                    log::add('phone_detection','debug', 'State property name: '. $statePropertyCmd->getHumanName());
-		    $currentState = $statePropertyCmd->execCmd() == 1;
-		    if ($currentState != $value) {
-                        log::add('phone_detection','debug', 'Update value to . ' . $value . ' for ' . $statePropertyCmd->getHumanName());
-                        $eqLogic->checkAndUpdateCmd($statePropertyCmd,$value);
-                        $eqLogic->computePresence();
-                        phone_detection::updateGlobalDevice();
-		    }
+                    $currentState = $statePropertyCmd->execCmd() == 1;
+                    log::add('phone_detection','info', 'Update value from ' . $currentState . ' to ' . $value . ' for ' . $statePropertyCmd->getHumanName());
+                    $eqLogic->checkAndUpdateCmd($statePropertyCmd, $value);
+                    $eqLogic->computePresence();
+                    phone_detection::updateGlobalDevice();
                     break;
                 }
             }
@@ -104,14 +101,14 @@ switch ($action) {
         $values = Null;
         foreach ($antennas as $antenna){
             if (method_exists($antenna, 'getRemoteName')) {
-	        $from = $antenna->getRemoteName();
-	    } else {
-	        $from = 'local';
-	    }
+            $from = $antenna->getRemoteName();
+        } else {
+            $from = 'local';
+        }
             if ($from == $results['source']){
-	        if (method_exists($antenna, 'setCache')) {
+            if (method_exists($antenna, 'setCache')) {
                    $antenna->setCache('lastupdate', date("Y-m-d H:i:s"));
-	        }
+            }
                 $statePropertyCmd = $eqLogic->getCmd(null, 'state_' . $results['source']);
                 if (!is_object($statePropertyCmd)) {
                     $statePropertyCmd = new phone_detectionCmd();
@@ -129,7 +126,7 @@ switch ($action) {
                 }
                 $value = $statePropertyCmd->execCmd();
                 break;
-            } 
+            }
         }
         $success = true;
         break;
@@ -147,7 +144,7 @@ switch ($action) {
         $values = Null;
         // $values["count"] = count($devices);
         // $values["devices"] = $devices;
-        
+
         foreach($devices as $d) {
             if ($d->getConfiguration('deviceType') != 'phone' || $d->getIsEnable() == false) {
                 continue;
@@ -155,14 +152,14 @@ switch ($action) {
 
             foreach ($antennas as $antenna){
                 if (method_exists($antenna, 'getRemoteName')) {
-	            $from = $antenna->getRemoteName();
-		} else {
-	            $from = 'local';
-	        }
+                $from = $antenna->getRemoteName();
+        } else {
+                $from = 'local';
+            }
                 if ($from == $results['source']){
-	            if (method_exists($antenna, 'setCache')) {
+                if (method_exists($antenna, 'setCache')) {
                        $antenna->setCache('lastupdate', date("Y-m-d H:i:s"));
-	            }
+                }
                     $statePropertyCmd = $d->getCmd(null, 'state_' . $results['source']);
                     if (!is_object($statePropertyCmd)) {
                         $statePropertyCmd = new phone_detectionCmd();
@@ -184,9 +181,9 @@ switch ($action) {
                     $humanName    = $d->getHumanName();
                     $id           = $d->getId();
                     $macAddress   = $d->getConfiguration('macAddress');
-            
+
                     $values[$id] = [
-                        "state"         => $stateValue, 
+                        "state"         => $stateValue,
                         "lastValueDate" => $getValueDate,
                         "name"          => $name,
                         "humanName"     => $humanName,
@@ -196,7 +193,7 @@ switch ($action) {
                     break;
                 }
             }
-        } 
+        }
         $success = true;
         $value = $values;
         break;
