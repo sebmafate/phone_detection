@@ -135,7 +135,7 @@ class PhoneDetection:
             logging.debug('{} is present'.format(self.device.deviceId))
             self.device.setReachable()
         except _bt.error as e:
-            logging.debug('bt error {}: {}'.format(e.args[0], e.args[1]))
+            logging.debug('BT exception raised: error code {}: {}'.format(e.args[0], e.args[1]))
             logging.debug('{} is absent'.format(self.device.deviceId))
             self.device.setNotReachable()
 

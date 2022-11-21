@@ -42,7 +42,7 @@ foreach ($remotes as $remote) {
 	if ($last == '0' or time() - strtotime($last)>65){
 		$icon = '<i class="fas fa-deaf" style="color:#b20000"></i>';
 	}
-	echo '<li class="cursor li_PhoneDetectionRemote" data-PhoneDetectionRemote_id="' . $remote->getId() . '" data-PhoneDetectionRemote_name="' . $remote->getRemoteName() . '"><a>' . $remote->getRemoteName() . ' '. $icon. ' - v' . $remote->getConfiguration('version','1.0') . ' - ' . $remote->getCache('lastupdate','0') .'</a></li>';
+	echo '<li class="cursor li_PhoneDetectionRemote" data-PhoneDetectionRemote_id="' . $remote->getId() . '" data-PhoneDetectionRemote_name="' . $remote->getRemoteName() . '"><a>' . $remote->getRemoteName() . ' '. $icon. ' - v' . $remote->getConfiguration('version','2.0') . ' - ' . $remote->getCache('lastupdate','0') .'</a></li>';
 }
 ?>
 			</ul>
