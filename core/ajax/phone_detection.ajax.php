@@ -109,17 +109,17 @@ try {
         ajax::success();
      }
 
-     if (init('action') == 'remotelearn') {
-        ajax::success(phone_detection::remotelearn(init('remoteId'), init('state')));
-     }
+     //if (init('action') == 'remotelearn') {
+     //   ajax::success(phone_detection::remotelearn(init('remoteId'), init('state')));
+     //}
 
      if (init('action') == 'dependancyRemote') {
         ajax::success(phone_detection::dependancyRemote(init('remoteId')));
      }
 
-     if (init('action') == 'aliveremote') {
-        ajax::success(phone_detection::aliveremote(init('remoteId')));
-     }
+    //if (init('action') == 'aliveremote') {
+    //    ajax::success(phone_detection::aliveremote(init('remoteId')));
+    //}
 
     if (init('action') == 'changeLogLive') {
         ajax::success(phone_detection::changeLogLive(init('level')));

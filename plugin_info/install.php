@@ -8,7 +8,7 @@ function phone_detection_install() {
     foreach (phone_detection::byType('phone_detection') as $phone_detection) {
         $phone_detection->save();
     }
-    config::save('version',phone_detection::$_version,'phone_detection');
+    config::save('version',phone_detection::getVersion(),'phone_detection');
 }
 
 function phone_detection_update() {
@@ -30,7 +30,7 @@ function phone_detection_update() {
     $cache->remove();
 
 
-    config::save('version',phone_detection::$_version,'phone_detection');
+    config::save('version',phone_detection::getVersion(),'phone_detection');
     if (config::byKey('allowUpdateAntennas','phone_detection',0) == 1) {
         log::add('phone_detection','info','Mise a jour des fichiers de toutes les antennes');
         phone_detection::send_allremotes();

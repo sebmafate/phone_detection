@@ -366,7 +366,7 @@ class phone_detection extends eqLogic
         return true;
     }
 
-    public function launch_allremotes(){
+    public static function launch_allremotes(){
         log::add('phone_detection','info','Launching remotes ...');
         $remotes = phone_detection_remote::all();
         foreach ($remotes as $remote) {
@@ -375,7 +375,7 @@ class phone_detection extends eqLogic
         }
     }
 
-    public function update_allremotes(){
+    public static function update_allremotes(){
         log::add('phone_detection','info','Updating remotes ...');
         $remotes = phone_detection_remote::all();
         foreach ($remotes as $remote) {
@@ -384,7 +384,7 @@ class phone_detection extends eqLogic
         }
     }
 
-    public function send_allremotes(){
+    public static function send_allremotes(){
         log::add('phone_detection','info','Updating files on remotes ...');
         $remotes = phone_detection_remote::all();
         foreach ($remotes as $remote) {
@@ -394,7 +394,7 @@ class phone_detection extends eqLogic
     }
 
 
-    public function stop_allremotes(){
+    public static function stop_allremotes(){
         log::add('phone_detection','info','Stopping remotes ...');
         $remotes = phone_detection_remote::all();
         foreach ($remotes as $remote) {
