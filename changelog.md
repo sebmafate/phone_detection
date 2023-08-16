@@ -6,7 +6,7 @@ lang: fr_FR
 
 # Changelog
 
-## 2022-01-03 v2.0.0
+## 2022-11-03 v2.0.0
 * Utilisation de pybluez pour effectuer un appel python au lieu d'un appel système de hciconfig pour la demande d'information du mobile.
   Il semble que cela solutionne les problèmes de blocage du daemon qui pouvait arriver sur raspberry.
   Installation de hcidump qui permet de surveiller en temps reel les paquets envoyés et reçus par l'antenne bluetooth. Pour voir les paquets, il suffit d’exécuter la commande 'hcidump -t -X'
