@@ -6,20 +6,39 @@ lang: fr_FR
 
 # Changelog
 
+## 2023-11-03 v2.1.0
+
+Pile un an apres la derniere modification majeure :)
+
+Pas mal de fixes, et d'ameliorations autour de la gestion des antennes et du bluetooth.
+  
+* Fixe un probleme sur l'arret des antennes via le plugin. Cela generait une exception, et le process phone_detectiond.py n'etait pas toujours arrete. En cas de redemarrage, une error "Socket already in use" etait generee.
+* Les logs des antennes etaient rappatriees toutes les 15 minutes sur le jeedom, et le fichier etait re-initialise a chaque fois. Maintenant, les logs sont concatenees pour chaque antenne.
+* la version indiquee par les antennes etaient folklorique. La version provenait de valeurs hardcodees dans le code php. Maintenant, un fichier version.txt est cree a l'installation ou la mise a jour du plugin phone_detection, et envoye a chaque antenne via "envoye les fichiers".
+* Il arrivait que le driver bluetooth soit inutilisable via l'API bluez. Il suffit en general d'un 'hciconfig hci0 reset' pour le rendre de nouveau operationel.
+  * Cette commande est utilisee au demarage du demon, si on ne parvient pas a initialiser la libraire bluetooth avec le bon module bluetooth.
+  * Une fois que le demon tourne sur l'antenne, un thread est cree pour chaque mobile a surveiller. Auparavant, si une exception etait genere car le module bluetooth n'etait pas operationel, le thread pouvait s'arreter, et ainsi ne plus monitorer le mobile, bien que le demon soit vu actif par jeedom. Maintenant, le thread va essayer 3 fois de reinitialiser le module bluetooth. En cas d'echec, le thread va s'arreter, sinon il va reprendre une surveillance active du telephone.
+  * Le demon sur l'antenne envoie de maniere reguliere des informations a jeedom pour lui indiquer qu'il est toujours vivant. J'ai ajoute plusieurs informations dans ce message envoye. D'une part, la version du demon phone_detectiond.py qui tourne sur l'antenne. D'autre part, le nombre de thread actif, c'est a dire le nombre de telephone toujours surveille, et le nombre total de telephone normalement surveille. Si ce nombre est different, cela signifie qu'il y a une un probleme bluetooth que le daemon n'a pas sur resoudre tout seul. Dans ce cas, le plugin phone_detection sur jeedom va arreter le demon. Si vous avez active la surveillance active du demon, celui-ci sera automatiquement redemarre.
+
+J'espere avoir fixe les problemes remontes recemments dans le forum, sinon, on aura en tout cas plus d'information pour comprendre les problemes.
+  
 ## 2022-11-03 v2.0.0
+
 * Utilisation de pybluez pour effectuer un appel python au lieu d'un appel système de hciconfig pour la demande d'information du mobile.
   Il semble que cela solutionne les problèmes de blocage du daemon qui pouvait arriver sur raspberry.
   Installation de hcidump qui permet de surveiller en temps reel les paquets envoyés et reçus par l'antenne bluetooth. Pour voir les paquets, il suffit d’exécuter la commande 'hcidump -t -X'
 
 ## 2021-10-18 v0.5.0
+
 * Correction d'un probleme de mise a jour de l'état du groupe de téléphone, suite a la perte d'une antenne. L'état était systématiquement passé a 0, même si certains téléphones étaient encore visible au travers d'autres antennes.
 
-
 ## 2021-05-26 v0.4.0
+
 * Ajout du support "multi-antennes" permettant d’étendre la couverture Bluetooth gérer par le plugin. Le multi-antennes utilisent le même principe que le plugin BLEA, en utilisant des équipements distantes possédant une clé Bluetooth et envoyant les informations au plugin phone_detection installe sur Jeedom.
 * Modification de l'interface 'configuration des équipements', pour être en phase avec le design 4.1 / 4.2. Cela comprend notamment la suppression du menu a gauche listant les équipements.
 
 ## v0.3
+
 Version stable du plugin, avec une unique antenne gérée sur le serveur Jeedom.
 
 # Documentation
