@@ -129,14 +129,16 @@ class phone_detection extends eqLogic
         return $result;
     }
 
-    public static function getRemoteLog($_remoteId,$_dependancy='') {
+    public static function getRemoteLog($_remoteId, $_dependancy='', $_append=false) {
         $remoteObject = phone_detection_remote::byId($_remoteId);
         $name = $remoteObject->getRemoteName();
         $local = dirname(__FILE__) . '/../../../../log/phone_detection_'.str_replace(' ','-',$name).$_dependancy;
-        log::add('phone_detection','info','Suppression de la log ' . $local);
-        exec('rm -f '. $local);
+        if ($_append == false && file_exists($local)) {
+            log::add('phone_detection','info','Suppression de la log ' . $local);
+            unlink($local);
+        }
         log::add('phone_detection','info',__('Récuperation de la log distante sur '.$name,__FILE__));
-        if ($remoteObject->getFiles($local,'/tmp/phone_detection'.$_dependancy)) {
+        if ($remoteObject->getFiles($local, '/tmp/phone_detection'.$_dependancy, $_append)) {
             $remoteObject->execCmd(['cat /dev/null > /tmp/phone_detection'.$_dependancy]);
             return true;
         }
@@ -187,7 +189,6 @@ class phone_detection extends eqLogic
         log::add('phone_detection','info',__('Arret du demon distant ' . $_remoteId,__FILE__));
         $remoteObject = phone_detection_remote::byId($_remoteId);
         $value = array('apikey' => jeedom::getApiKey('phone_detection'), 'action' => 'stop', 'args' => '');
-        $value = json_encode($value);
         phone_detection::callRemoteDaemon($value, $remoteObject);
         $port   = config::byKey('socketport', 'phone_detection', 55009);
         $remoteObject->execCmd(['fuser -k ' . $port . '/tcp >> /dev/null 2>&1 &']);
@@ -477,10 +478,10 @@ class phone_detection extends eqLogic
         $remotes = phone_detection_remote::getCacheRemotes('allremotes',array());
         $availremote= array();
         foreach ($remotes as $remote) {
-	    if (method_exists($remote, 'getRemoteName')) {
+	        if (method_exists($remote, 'getRemoteName')) {
                 $availremote[] = $remote->getRemoteName();
-                self::getRemoteLog($remote->getId());
-	    }
+                self::getRemoteLog($remote->getId(), '', true);
+	        }
         }
         foreach (eqLogic::byType('phone_detection') as $eqLogic){
             foreach ($eqLogic->getCmd('info') as $cmd) {

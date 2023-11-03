@@ -11,7 +11,7 @@ if (!jeedom::apiAccess(init('apikey'), 'phone_detection')) {
 $results  = json_decode(file_get_contents("php://input"), true);
 $action   = $results['action'];
 $value    = 0;
-$antennas = phone_detection_remote::getCacheRemotes('allremotes',array());
+$antennas = phone_detection_remote::getCacheRemotes('allremotes', array());
 if (config::byKey('noLocal', 'phone_detection', 0) == 0){
     $local = array('id'=>0,'remoteName'=>'local','configuration'=>array());
     array_push($antennas, $local);
@@ -19,14 +19,12 @@ if (config::byKey('noLocal', 'phone_detection', 0) == 0){
 
 switch ($action) {
     case "update_device_status":
-        log::add('phone_detection','info','Update device status from antenna ' . $results['source']);
-        $source = $results['source'];
-        $id     = $results['id'];
-        $value  = $results['value'];
-        log::add('phone_detection', 'debug', 'id: '.$id . ', value:' . $value);
-
+        $source  = $results['source'];
+        $id      = $results['id'];
+        $value   = $results['value'];
         $eqLogic = eqLogic::byId($id);
-        log::add('phone_detection','debug', 'Device Name: '. $eqLogic->getHumanName());
+
+        log::add('phone_detection','info','Update device status from antenna ' . $source . ' for ' . $eqLogic->getHumanName());
         if ($eqLogic->getConfiguration('deviceType') == 'phone' && $eqLogic->getIsEnable()) {
             foreach ($antennas as $antenna){
                 if (method_exists($antenna, 'getRemoteName')) {
@@ -34,21 +32,21 @@ switch ($action) {
                 } else {
                     $from = 'local';
                 }
-                if ($from == $results['source']){
+                if ($from == $source){
                     if (method_exists($antenna, 'setCache')) {
                         $antenna->setCache('lastupdate', date("Y-m-d H:i:s"));
                     }
-                    $statePropertyCmd = $eqLogic->getCmd(null, 'state_' . $results['source']);
+                    $statePropertyCmd = $eqLogic->getCmd(null, 'state_' . $source);
                     if (!is_object($statePropertyCmd)) {
                         $statePropertyCmd = new phone_detectionCmd();
-                        $statePropertyCmd->setLogicalId('state_' . $results['source']);
+                        $statePropertyCmd->setLogicalId('state_' . $source);
                         $statePropertyCmd->setIsVisible(0);
                         $statePropertyCmd->setIsHistorized(0);
-                        $statePropertyCmd->setName(__('Etat_'. $results['source'], __FILE__));
+                        $statePropertyCmd->setName(__('Etat_'. $source, __FILE__));
                         $statePropertyCmd->setType('info');
                         $statePropertyCmd->setSubType('binary');
-                        $statePropertyCmd->setTemplate('dashboard','line');
-                        $statePropertyCmd->setTemplate('mobile','line');
+                        $statePropertyCmd->setTemplate('dashboard', 'line');
+                        $statePropertyCmd->setTemplate('mobile', 'line');
                         $statePropertyCmd->setEqLogic_id($eqLogic->getId());
                         $statePropertyCmd->save();
                     }
@@ -65,10 +63,12 @@ switch ($action) {
         break;
 
     case "test":
-        log::add('phone_detection','info','Receive a test from antenna ' . $results['source']);
-        if ($results['source'] != 'local'){
+        $source  = $results['source'];
+
+        log::add('phone_detection','info','Receive a test from antenna ' . $source);
+        if ($source != 'local'){
             foreach ($antennas as $antenna){
-                if ($antenna->getRemoteName() == $results['source']){
+                if ($antenna->getRemoteName() == $source){
                     $antenna->setCache('lastupdate', date("Y-m-d H:i:s"));
                     break;
                 }
@@ -79,11 +79,21 @@ switch ($action) {
         break;
 
     case "heartbeat":
-        log::add('phone_detection','debug','This is a heartbeat from antenna ' . $results['source']);
-        if ($results['source'] != 'local'){
+        $source   = $results['source'];
+        $version  = $results['version'];
+        $count    = $results['count'];
+        $monitor  = $results['monitor'];        
+        log::add('phone_detection','debug','This is a heartbeat from antenna ' . $source . ' version=' . $version . ' (count=' . $count . '/monitor=' . $monitor);
+        if ($source != 'local'){
             foreach ($antennas as $antenna){
-                if ($antenna->getRemoteName() == $results['source']){
-                    $antenna->setCache('lastupdate', date("Y-m-d H:i:s"));
+                if ($antenna->getRemoteName() == $source){
+                    $antenna->setCache('version', $version);
+                    if ($count < $monitored) {
+                        log::add('phone_detection', 'warn', 'Stoping antenna ' . $antenna->getRemoteName() . ' because count=' . $count . '/monitor=' . $monitor);
+                        phone_detection::stopremote($antenna->getId());
+                    } else {
+                        $antenna->setCache('lastupdate', date("Y-m-d H:i:s"));
+                    }
                     break;
                 }
             }
@@ -93,36 +103,37 @@ switch ($action) {
         break;
 
     case "get_status":
-        log::add('phone_detection','info','Receive get_status for from antenna ' . $results['source']);
-        $id = $results['id'];
-        log::add('phone_detection', 'debug', 'id: '.$id);
+        $source  = $results['source'];
+        $id      = $results['id'];
         $eqLogic = eqLogic::byId($id);
+        
+        log::add('phone_detection','info','Receive get_status for ' . $eqLogic->getHumanName() . ' from antenna ' . $source);
 
         $values = Null;
         foreach ($antennas as $antenna){
             if (method_exists($antenna, 'getRemoteName')) {
-            $from = $antenna->getRemoteName();
-        } else {
-            $from = 'local';
-        }
-            if ($from == $results['source']){
-            if (method_exists($antenna, 'setCache')) {
-                   $antenna->setCache('lastupdate', date("Y-m-d H:i:s"));
+                $from = $antenna->getRemoteName();
+            } else {
+                $from = 'local';
             }
-                $statePropertyCmd = $eqLogic->getCmd(null, 'state_' . $results['source']);
+            if ($from == $source){
+                if (method_exists($antenna, 'setCache')) {
+                   $antenna->setCache('lastupdate', date("Y-m-d H:i:s"));
+                }
+                $statePropertyCmd = $eqLogic->getCmd(null, 'state_' . $source);
                 if (!is_object($statePropertyCmd)) {
                     $statePropertyCmd = new phone_detectionCmd();
-                    $statePropertyCmd->setLogicalId('state_' . $results['source']);
+                    $statePropertyCmd->setLogicalId('state_' . $source);
                     $statePropertyCmd->setIsVisible(0);
                     $statePropertyCmd->setIsHistorized(0);
-                    $statePropertyCmd->setName(__('Etat_'. $results['source'], __FILE__));
+                    $statePropertyCmd->setName(__('Etat_'. $source, __FILE__));
                     $statePropertyCmd->setType('info');
                     $statePropertyCmd->setSubType('binary');
-                    $statePropertyCmd->setTemplate('dashboard','line');
-                    $statePropertyCmd->setTemplate('mobile','line');
+                    $statePropertyCmd->setTemplate('dashboard', 'line');
+                    $statePropertyCmd->setTemplate('mobile', 'line');
                     $statePropertyCmd->setEqLogic_id($eqLogic->getId());
                     $statePropertyCmd->save();
-                    $eqLogic->checkAndUpdateCmd($statePropertyCmd,0);
+                    $eqLogic->checkAndUpdateCmd($statePropertyCmd, 0);
                 }
                 $value = $statePropertyCmd->execCmd();
                 break;
@@ -132,18 +143,20 @@ switch ($action) {
         break;
 
     case "refresh_group":
-        log::add('phone_detection','info','Receive refresh_group from antenna ' . $results['source']);
+        $source  = $results['source'];
+
+        log::add('phone_detection','info','Receive refresh_group from antenna ' . $source);
         phone_detection::updateGlobalDevice();
         $success = true;
         break;
 
     case "get_devices":
-        log::add('phone_detection','info','Receive get_devices from antenna ' . $results['source']);
+        $source  = $results['source'];
+
+        log::add('phone_detection','info','Receive get_devices from antenna ' . $source);
         phone_detection::updateGlobalDevice();
         $devices = eqLogic::byType("phone_detection", true);
         $values = Null;
-        // $values["count"] = count($devices);
-        // $values["devices"] = $devices;
 
         foreach($devices as $d) {
             if ($d->getConfiguration('deviceType') != 'phone' || $d->getIsEnable() == false) {
@@ -156,24 +169,24 @@ switch ($action) {
         } else {
                 $from = 'local';
             }
-                if ($from == $results['source']){
+                if ($from == $source){
                 if (method_exists($antenna, 'setCache')) {
                        $antenna->setCache('lastupdate', date("Y-m-d H:i:s"));
                 }
-                    $statePropertyCmd = $d->getCmd(null, 'state_' . $results['source']);
+                    $statePropertyCmd = $d->getCmd(null, 'state_' . $source);
                     if (!is_object($statePropertyCmd)) {
                         $statePropertyCmd = new phone_detectionCmd();
-                        $statePropertyCmd->setLogicalId('state_' . $results['source']);
+                        $statePropertyCmd->setLogicalId('state_' . $source);
                         $statePropertyCmd->setIsVisible(0);
                         $statePropertyCmd->setIsHistorized(0);
-                        $statePropertyCmd->setName(__('Etat_'. $results['source'], __FILE__));
+                        $statePropertyCmd->setName(__('Etat_'. $source, __FILE__));
                         $statePropertyCmd->setType('info');
                         $statePropertyCmd->setSubType('binary');
-                        $statePropertyCmd->setTemplate('dashboard','line');
-                        $statePropertyCmd->setTemplate('mobile','line');
+                        $statePropertyCmd->setTemplate('dashboard', 'line');
+                        $statePropertyCmd->setTemplate('mobile', 'line');
                         $statePropertyCmd->setEqLogic_id($d->getId());
                         $statePropertyCmd->save();
-                        $d->checkAndUpdateCmd($statePropertyCmd,0);
+                        $d->checkAndUpdateCmd($statePropertyCmd, 0);
                     }
                     $stateValue   = $statePropertyCmd->execCmd() == 1;
                     $getValueDate = $statePropertyCmd->getValueDate();

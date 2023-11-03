@@ -104,6 +104,7 @@ class PhoneDetection:
         self.present_interval = present_interval
         self._stop = False
         self.callback = callback
+        self.btRetries = 0
 
     def start(self):
         logging.info('Start thread detection for {} [{}]'.format(self.device.humanName, self.device.macAddress))
@@ -124,22 +125,35 @@ class PhoneDetection:
             del self.t
             gc.collect()
 
+    def isAlive(self):
+        return (True == self.t.is_alive())
+
     def GetPhoneInformation(self):
         logging.debug('Get phone information {}'.format(self.device.deviceId))
         if not bluetooth.is_valid_address(self.device.macAddress):
             raise Exception('Phone not monitored because invalid mac address')
 
-        sock = _bt.hci_open_dev(self.btController)
         try:
-            name = _bt.hci_read_remote_name (sock, self.device.macAddress, 5192)
-            logging.debug('{} is present'.format(self.device.deviceId))
-            self.device.setReachable()
+            sock = _bt.hci_open_dev(self.btController)
+            try:
+                name = _bt.hci_read_remote_name (sock, self.device.macAddress, 5192)
+                logging.debug('{} is present'.format(self.device.deviceId))
+                self.device.setReachable()
+            except _bt.error as e:
+                logging.debug('BT exception raised: error code {}: {}'.format(e.args[0], e.args[1]))
+                logging.debug('{} is absent'.format(self.device.deviceId))
+                self.device.setNotReachable()
         except _bt.error as e:
-            logging.debug('BT exception raised: error code {}: {}'.format(e.args[0], e.args[1]))
-            logging.debug('{} is absent'.format(self.device.deviceId))
-            self.device.setNotReachable()
-
-        sock.close()
+            logging.error('Unable to get status for {}, cause (bluetooth device {}, error code {}: {})'.format(self.device.deviceId, self.btController, e.args[0], e.args[1]))
+            if subprocess.call('sudo hciconfig {} reset'.format(args.device), shell=True) != 0:
+                self.btRetries += 1
+                if self.btRetries > 5:
+                    logging.critical('Unable to reset the hci driver {}. Stopping this thread !!!'.format(args.device))                    
+                    self.stop(False)
+            else:
+                self.btRetries = 0
+        finally:
+            sock.close()            
 
     def __run(self):
         sleepTime = self.interval
@@ -222,8 +236,13 @@ class JeedomCallback:
             return False
         return True
 
-    def heartbeat(self):
-        r = self.__send_now({'action':'heartbeat'})
+    def heartbeat(self, version):
+        aliveCount = 0
+        for key in THREADS:
+            isAlive = THREADS[key].isAlive()
+            logging.debug("\t==> {}: is_alive: {}".format(THREADS[key].device.humanName, isAlive))
+            aliveCount = aliveCount + isAlive
+        r = self.__send_now({'action':'heartbeat', 'version': version, 'alive': aliveCount, 'monitor': len(THREADS.keys())})
         if not r or not r.get('success'):
             logging.error('Error during heartbeat')
             return False
@@ -280,19 +299,19 @@ class JeedomHandler(socketserver.BaseRequestHandler):
     def handle(self):
         # self.request is the TCP socket connected to the client
         self.data = self.request.recv(1024)
-        logging.debug("Message received in socket")
+        logging.debug('Message received in socket, length: {}'.format(len(self.data)))
         message = json.loads(self.data.decode())
-        lmessage = dict(message)
-        del lmessage['apikey']
-        logging.debug(lmessage)
+        logging.debug(message)
+
         response = {'result': None, 'success': True}
         stop = False
-        if message.get('apikey') != _apikey:
+        if message['apikey'] != _apikey:
             logging.error("Invalid apikey from socket : {}".format(self.data))
             return
+        del message['apikey']
 
-        action = message.get('action')
-        args = message.get('args')
+        action = message['action']
+        args = message['args']
 
         if action == 'update_device' or action == 'insert_device':
             mid = args[0]
@@ -358,9 +377,10 @@ class JeedomHandler(socketserver.BaseRequestHandler):
 Class gérant le threadle heartbeat
 """
 class HeartbeatThread:
-    def __init__(self, callback):
+    def __init__(self, callback, version):
         self._stop = False
         self.callback = callback
+        self.version = version
 
     def start(self):
         logging.info('Start heartbeat thread')
@@ -380,7 +400,7 @@ class HeartbeatThread:
     def __run(self):
         sleepTime = 30
         while not self._stop:
-            self.callback.heartbeat()
+            self.callback.heartbeat(self.version)
             time.sleep(sleepTime)
 
 
@@ -449,7 +469,16 @@ logging.basicConfig(level=LOGLEVEL,
 urllib3_logger = logging.getLogger('urllib3')
 urllib3_logger.setLevel(logging.CRITICAL)
 
+# Recupere la version du plugin
+try:
+    with open(os.path.dirname(__file__) + '/version.txt', 'r') as fp:
+        version = fp.read();
+        fp.close()
+except FileNotFoundError:
+    version = '?.?.?'
+
 logging.info('Start {}d'.format(PLUGIN_NAME))
+logging.info('Version: {}'.format(version))
 logging.info('Log level : {}'.format(args.loglevel))
 logging.info('Socket : {}'.format(args.socket))
 logging.info('SocketHost : {}'.format(args.sockethost))
@@ -469,8 +498,14 @@ _apikey = args.apikey
 
 BTCONTROLLER = _bt.hci_devid(args.device)
 if BTCONTROLLER == -1:
-    logging.critical('Invalid bluetooth controller ' . args.device)
-    sys.exit(1)
+    # The controller doesn't exist or cannot be used. Trying to reset the controller
+    logging.error('Invalid bluetooth controller or unable to connect to {}, resetting the controller'.format(args.device))
+    subprocess.call('sudo hciconfig {} reset'.format(args.device), shell=True)
+    BTCONTROLLER = _bt.hci_devid(args.device)
+    if BTCONTROLLER == -1:
+        logging.critical('Invalid bluetooth controller {}'.format(args.device))
+        sys.exit(1)
+logging.info('Using bluetooth controller {}'.format(args.device))
 
 INTERVAL = int(args.interval)
 PRESENTINTERVAL = int(args.present_interval)
@@ -485,6 +520,7 @@ pid = str(os.getpid())
 logging.debug("Writing PID " + pid + " to " + str(args.pidfile))
 with open(args.pidfile, 'w') as fp:
     fp.write("%s\n" % pid)
+    fp.close()
 
 # Configure et test le callback vers jeedom
 jc = JeedomCallback(args.apikey, args.callback, args.daemonname) # , int(args.interval), int(args.present_interval), args.device
@@ -492,7 +528,7 @@ if not jc.test():
     sys.exit()
 
 # Demarrage des heartbeat vers jeedom
-HEARTBEAT = HeartbeatThread(jc)
+HEARTBEAT = HeartbeatThread(jc, version)
 HEARTBEAT.start()
 
 # Démarre le serveur qui écoute les requests de jeedom

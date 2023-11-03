@@ -152,11 +152,39 @@ class phone_detection_remote {
 		return true;
 	}
 
-	public function getFiles($_local, $_target) {
+	private function appendFileContents($sourceFile, $targetFile) {
+		try {
+			// Open the source file in read mode and the target file in append mode
+			$source = fopen($sourceFile, 'r');
+			$target = fopen($targetFile, 'a');
+	
+			if ($source && $target) {
+				// Read the content of the source file and append it to the target file
+				while (($line = fgets($source)) !== false) {
+					fwrite($target, $line);
+				}
+			} else {
+				log::add('phone_detection', 'error', 'Error opening files: ' . $sourceFile . ' or ' . $targetFile);
+			}
+		} catch (Exception $e) {
+			log::add('phone_detection', 'error', 'An error occurred: ' . $e->getMessage());
+		}
+		finally {
+			fclose($source);
+			fclose($target);
+		}
+	}
+
+	public function getFiles($_local, $_target, $_append=false) {
 		$ip = $this->getConfiguration('remoteIp');
 		$port = $this->getConfiguration('remotePort');
 		$user = $this->getConfiguration('remoteUser');
 		$pass = $this->getConfiguration('remotePassword');
+		if ($_append == false) {
+			$localFile = $_local;
+		} else {
+			$localFile = jeedom::getTmpFolder('phone_detection') . basename($_local);
+		}
 		if (!$connection = ssh2_connect($ip, $port)) {
 			log::add('phone_detection', 'error', 'connexion SSH KO for ' . $this->remoteName);
 				return false;
@@ -166,7 +194,7 @@ class phone_detection_remote {
 				return false;
 			} else {
 				log::add('phone_detection', 'info', __('Récupération de fichier depuis ',__FILE__) . $ip);
-				$result = ssh2_scp_recv($connection, $_target, $_local);
+				$result = ssh2_scp_recv($connection, $_target, $localFile);
 				$execmd = "echo '" . $pass . "' | sudo -S " . 'exit';
 				$stream = ssh2_exec($connection, $execmd);
 				$errorStream = ssh2_fetch_stream($stream, SSH2_STREAM_STDERR);
@@ -178,6 +206,11 @@ class phone_detection_remote {
 				if (trim($output) != '') {
 					log::add('phone_detection','debug',$output);
 				}
+			}
+			// Append the file if needed
+			if ($_append == true) {
+				$this->appendFileContents($localFile, $_local);
+				unlink($localFile);
 			}
 		}
 		return true;

@@ -70,7 +70,8 @@ nfinie et dans tous les cas la roue restera le temps de maj des antennes}}"></i>
     <div class="form-group">
         <label class="col-lg-4 control-label">{{Version Démon Local}}</label>
         <div class="col-lg-3">
-           <span class="configKey" data-l1key="version" />
+           <!--span class="configKey" data-l1key="version" /-->
+           <span class="configKey"><?php echo phone_detection::getVersion(); ?></span>
        </div>
     </div>
         <?php
@@ -79,7 +80,7 @@ nfinie et dans tous les cas la roue restera le temps de maj des antennes}}"></i>
                 echo '<div class="form-group">';
                 echo '<label class="col-lg-4 control-label">{{Version Démon }}' . $remote->getRemoteName() . '</label>';
                 echo '<div class="col-lg-3">';
-                echo '<span>' . $remote->getConfiguration('version','1.0') . '</span>';
+                echo '<span>' . $remote->getCache('version','?.?.?') . '</span>';
                 echo '</div>';
                 echo '</div>';
             }

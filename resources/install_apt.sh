@@ -21,7 +21,7 @@ sudo pip3 install pyudev
 sudo pip3 install pyserial
 sudo pip3 install requests
 #sudo pip3 install pybluez  !!! FAILED
-sudo apt install python3-bluez
+sudo apt install -y python3-bluez
 # end patch
 echo 60 > ${PROGRESS_FILE}
 sudo connmanctl enable bluetooth >/dev/null 2>&1
