@@ -10,7 +10,7 @@ lang: fr_FR
 
 Pile un an apres la derniere modification majeure :)
 
-Pas mal de fixes, et d'ameliorations autour de la gestion des antennes et du bluetooth.
+Pas mal de fixes, et d'ameliorations autour de la gestion des antennes et du bluetooth. N'oubliez pas de mettre a jour vos antennes !
   
 * Fixe un probleme sur l'arret des antennes via le plugin. Cela generait une exception, et le process phone_detectiond.py n'etait pas toujours arrete. En cas de redemarrage, une error "Socket already in use" etait generee.
 * Les logs des antennes etaient rappatriees toutes les 15 minutes sur le jeedom, et le fichier etait re-initialise a chaque fois. Maintenant, les logs sont concatenees pour chaque antenne.
