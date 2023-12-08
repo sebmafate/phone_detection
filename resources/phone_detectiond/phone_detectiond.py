@@ -61,10 +61,10 @@ class Phone:
 
     def setNotReachable(self):
         thresholdDate = self.lastStateDate + timedelta(seconds=int(args.absentThreshold))
-        logging.debug('lastStateDate: {}'.format(self.lastStateDate))
-        logging.debug('thresholdDate: {}'.format(thresholdDate))
-        logging.debug('datetime.utcnow(): {}'.format(datetime.utcnow()))
-        logging.debug('is datetime.utcnow() > thresholdDate ? {}'.format(datetime.utcnow() > thresholdDate))
+        logging.debug('[{}]: lastStateDate: {}'.format(int(self.deviceId), self.lastStateDate))
+        logging.debug('[{}]: thresholdDate: {}'.format(int(self.deviceId), thresholdDate))
+        logging.debug('[{}]: datetime.utcnow(): {}'.format(int(self.deviceId), datetime.utcnow()))
+        logging.debug('[{}]: isReachable: {}, is datetime.utcnow() > thresholdDate ? {}'.format(int(self.deviceId), self.isReachable, datetime.utcnow() > thresholdDate))
         if self.isReachable and datetime.utcnow() > thresholdDate:
             self.isReachable = False
             self.lastStateDate = datetime.utcnow()
@@ -134,26 +134,49 @@ class PhoneDetection:
             raise Exception('Phone not monitored because invalid mac address')
 
         try:
-            sock = _bt.hci_open_dev(self.btController)
-            try:
-                name = _bt.hci_read_remote_name (sock, self.device.macAddress, 5192)
-                logging.debug('{} is present'.format(self.device.deviceId))
-                self.device.setReachable()
-            except _bt.error as e:
-                logging.debug('BT exception raised: error code {}: {}'.format(e.args[0], e.args[1]))
-                logging.debug('{} is absent'.format(self.device.deviceId))
-                self.device.setNotReachable()
-        except _bt.error as e:
+            result = subprocess.run(['hcitool', '-i', self.btController, 'name', self.device.macAddress], stdout = subprocess.PIPE)
+            # check_returncode will generate a CallProcessError exception if return_code is not 0.
+            result.check_returncode()
+            if result.stdout:
+               logging.debug('[{}] is present'.format(self.device.deviceId))
+               self.device.setReachable()
+            else:
+                logging.debug('[{}] is absent'.format(self.device.deviceId))
+                self.device.setNotReachable()        
+            self.btRetries = 0            
+        except subprocess.CalledProcessError as e:            
             logging.error('Unable to get status for {}, cause (bluetooth device {}, error code {}: {})'.format(self.device.deviceId, self.btController, e.args[0], e.args[1]))
-            if subprocess.call('sudo hciconfig {} reset'.format(args.device), shell=True) != 0:
+            try:
+                subprocess.check_call('sudo hciconfig {} reset'.format(args.device), shell=True)
+            except subprocess.CalledProcessError as e:
                 self.btRetries += 1
                 if self.btRetries > 5:
                     logging.critical('Unable to reset the hci driver {}. Stopping this thread !!!'.format(args.device))                    
                     self.stop(False)
-            else:
-                self.btRetries = 0
-        finally:
-            sock.close()            
+        #try:
+            #sock = _bt.hci_open_dev(self.btController)
+            #try:
+            #    name = _bt.hci_read_remote_name (sock, self.device.macAddress, 5192)
+            #    logging.debug('{} is present'.format(self.device.deviceId))
+            #    self.device.setReachable()
+            #except _bt.error as e:
+            #    if e.args[0] == 110:
+            #        #logging.debug('BT exception raised: error code {}: {}'.format(e.args[0], e.args[1]))
+            #        logging.debug('{} is absent'.format(self.device.deviceId))
+            #        self.device.setNotReachable()
+            #    else:
+            #        raise e
+        #except _bt.error as e:
+        #    logging.error('Unable to get status for {}, cause (bluetooth device {}, error code {}: {})'.format(self.device.deviceId, self.btController, e.args[0], e.args[1]))
+        #    if subprocess.call('sudo hciconfig {} reset'.format(args.device), shell=True) != 0:
+        #        self.btRetries += 1
+        #        if self.btRetries > 5:
+        #            logging.critical('Unable to reset the hci driver {}. Stopping this thread !!!'.format(args.device))                    
+        #            self.stop(False)
+        #    else:
+        #        self.btRetries = 0
+        #finally:
+        #    sock.close()            
 
     def __run(self):
         sleepTime = self.interval
@@ -161,18 +184,18 @@ class PhoneDetection:
             try:
                 self.GetPhoneInformation()
                 if self.device.mustUpdate:
-                    logging.debug('{} status has changed to \'{}\'! Notify Jeedom.'.format(self.device.humanName, ('absent','present')[self.device.isReachable]))
+                    logging.info('{} status has changed to \'{}\'! Notify Jeedom.'.format(self.device.humanName, ('absent','present')[self.device.isReachable]))
                     if self.callback.setDeviceStatus(int(self.device.deviceId), self.device.isReachable):
                         self.device.lastStateDate = datetime.utcnow()
                         self.device.mustUpdate = False
                 else:
                     refreshDate = self.device.lastRefreshDate + timedelta(seconds=300)
                     if datetime.utcnow() > refreshDate:
-                        logging.debug('{} forced refresh !'.format(int(self.device.deviceId)))
+                        logging.debug('{}: periodic refresh (300s) --> status: {}'.format(self.device.humanName, self.device.isReachable))
                         self.device.lastRefreshDate = datetime.utcnow()
                         self.callback.setDeviceStatus(int(self.device.deviceId), self.device.isReachable)
             except Exception as e:
-                logging.info('Unknow exception {} while processing mobile {} [{}]'.format(e, self.device.humanName, self.device.macAddress))
+                logging.error('Unknow exception {} while processing mobile {} [{}]'.format(e, self.device.humanName, self.device.macAddress))
 
             if self.device.isReachable:
                 sleepTime = self.present_interval
@@ -256,7 +279,7 @@ class JeedomCallback:
         return r['value'] == 1
 
     def setDeviceStatus(self, deviceId, status):
-        logging.debug('device status: {}'.format(status))
+        logging.debug('[{}]: device status: {}'.format(deviceId, status))
 
         r = self.__send_now({'action': 'update_device_status', 'id' : deviceId, 'value': (0,1)[status]})
         if not r or not r.get('success'):
@@ -496,16 +519,17 @@ _pidfile = args.pidfile
 _sockfile = args.socket
 _apikey = args.apikey
 
-BTCONTROLLER = _bt.hci_devid(args.device)
-if BTCONTROLLER == -1:
-    # The controller doesn't exist or cannot be used. Trying to reset the controller
-    logging.error('Invalid bluetooth controller or unable to connect to {}, resetting the controller'.format(args.device))
-    subprocess.call('sudo hciconfig {} reset'.format(args.device), shell=True)
-    BTCONTROLLER = _bt.hci_devid(args.device)
-    if BTCONTROLLER == -1:
-        logging.critical('Invalid bluetooth controller {}'.format(args.device))
-        sys.exit(1)
-logging.info('Using bluetooth controller {}'.format(args.device))
+BTCONTROLLER = args.device
+#BTCONTROLLER = _bt.hci_devid(args.device)
+#if BTCONTROLLER == -1:
+#    # The controller doesn't exist or cannot be used. Trying to reset the controller
+#    logging.error('Invalid bluetooth controller or unable to connect to {}, resetting the controller'.format(args.device))
+#    subprocess.call('sudo hciconfig {} reset'.format(args.device), shell=True)
+#    BTCONTROLLER = _bt.hci_devid(args.device)
+#    if BTCONTROLLER == -1:
+#        logging.critical('Invalid bluetooth controller {}'.format(args.device))
+#        sys.exit(1)
+#logging.info('Using bluetooth controller {}'.format(args.device))
 
 INTERVAL = int(args.interval)
 PRESENTINTERVAL = int(args.present_interval)
@@ -525,7 +549,7 @@ with open(args.pidfile, 'w') as fp:
 # Configure et test le callback vers jeedom
 jc = JeedomCallback(args.apikey, args.callback, args.daemonname) # , int(args.interval), int(args.present_interval), args.device
 if not jc.test():
-    sys.exit()
+    sys.exit(1)
 
 # Demarrage des heartbeat vers jeedom
 HEARTBEAT = HeartbeatThread(jc, version)
@@ -538,9 +562,21 @@ if args.socket != None and len(args.socket) > 0:
         os.unlink(args.socket)
     server = socketserver.UnixStreamServer(args.socket, JeedomHandler)
 else:
-    logging.info('Use TCP socket for Jeedom -> daemon communication')
-    socketserver.TCPServer.allow_reuse_address = True
-    server = socketserver.TCPServer((args.sockethost, int(args.socketport)), JeedomHandler)
+    try:
+        logging.info('Use TCP socket for Jeedom -> daemon communication')
+        socketserver.TCPServer.allow_reuse_address = True
+        server = socketserver.TCPServer((args.sockethost, int(args.socketport)), JeedomHandler)
+    except OSError as e:
+        if e.errno == 98:
+            logging.info('TCP socket in use, wait 5 seconds and retry')
+            time.sleep(5)
+            socketserver.TCPServer.allow_reuse_address = True
+            try:
+                server = socketserver.TCPServer((args.sockethost, int(args.socketport)), JeedomHandler)
+            except:
+                logging.error('Unable to create TCP socket for Jeedom to daemon communication. Exiting')
+                sys.exit(1)
+
 
 handlerThread = threading.Thread(target=server.serve_forever)
 handlerThread.start()

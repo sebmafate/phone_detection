@@ -24,7 +24,7 @@ switch ($action) {
         $value   = $results['value'];
         $eqLogic = eqLogic::byId($id);
 
-        log::add('phone_detection','info','Update device status from antenna ' . $source . ' for ' . $eqLogic->getHumanName());
+        log::add('phone_detection','info','Update device status (' . $value . ') from antenna ' . $source . ' for ' . $eqLogic->getHumanName());
         if ($eqLogic->getConfiguration('deviceType') == 'phone' && $eqLogic->getIsEnable()) {
             foreach ($antennas as $antenna){
                 if (method_exists($antenna, 'getRemoteName')) {
@@ -49,8 +49,9 @@ switch ($action) {
                         $statePropertyCmd->setTemplate('mobile', 'line');
                         $statePropertyCmd->setEqLogic_id($eqLogic->getId());
                         $statePropertyCmd->save();
+                        $eqLogic->checkAndUpdateCmd($statePropertyCmd, 0);
                     }
-                    $currentState = $statePropertyCmd->execCmd() == 1;
+                    $currentState = (int)($statePropertyCmd->execCmd() == 1);
                     log::add('phone_detection','info', 'Update value from ' . $currentState . ' to ' . $value . ' for ' . $statePropertyCmd->getHumanName());
                     $eqLogic->checkAndUpdateCmd($statePropertyCmd, $value);
                     $eqLogic->computePresence();
@@ -89,8 +90,9 @@ switch ($action) {
                 if ($antenna->getRemoteName() == $source){
                     $antenna->setCache('version', $version);
                     if ($count < $monitored) {
-                        log::add('phone_detection', 'warn', 'Stoping antenna ' . $antenna->getRemoteName() . ' because count=' . $count . '/monitor=' . $monitor);
+                        log::add('phone_detection', 'warn', 'Arret de l\'antenne ' . $antenna->getRemoteName() . ' because count=' . $count . '/monitor=' . $monitor);
                         phone_detection::stopremote($antenna->getId());
+                        message::add('phone_detection', 'Arret de l\'antenne ' . $antenna->getRemoteName() . ' suite a un probleme reporte par l\'antenne.');
                     } else {
                         $antenna->setCache('lastupdate', date("Y-m-d H:i:s"));
                     }
@@ -135,7 +137,7 @@ switch ($action) {
                     $statePropertyCmd->save();
                     $eqLogic->checkAndUpdateCmd($statePropertyCmd, 0);
                 }
-                $value = $statePropertyCmd->execCmd();
+                $value = (int) ($statePropertyCmd->execCmd() == 1);
                 break;
             }
         }
@@ -188,7 +190,7 @@ switch ($action) {
                         $statePropertyCmd->save();
                         $d->checkAndUpdateCmd($statePropertyCmd, 0);
                     }
-                    $stateValue   = $statePropertyCmd->execCmd() == 1;
+                    $stateValue   = (int)($statePropertyCmd->execCmd() == 1);
                     $getValueDate = $statePropertyCmd->getValueDate();
                     $name         = $d->getName();
                     $humanName    = $d->getHumanName();

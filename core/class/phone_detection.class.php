@@ -80,15 +80,13 @@ class phone_detection extends eqLogic
 
         $devices = eqLogic::byType("phone_detection", true);
         $deviceCount = 0;
-        // $values["count"] = count($devices);
-        // $values["devices"] = $devices;
 
         foreach($devices as $d) {
             if ($d->getConfiguration('deviceType') != 'phone') {
                 continue;
             }
             $statePropertyCmd = $d->getCmd('info', 'state');
-            $stateValue       = $statePropertyCmd->execCmd();
+            $stateValue       = (int) ($statePropertyCmd->execCmd() == 1);
             log::add('phone_detection', 'debug', $d->getHumanName() . '-->' . $stateValue);
             $deviceCount += $stateValue;
         }
@@ -97,12 +95,12 @@ class phone_detection extends eqLogic
         $stateCmd = $globalDevice->getCmd('info', 'state');
         $newState = ($deviceCount > 0 ? 1 : 0);
         $globalDevice->checkAndUpdateCmd($stateCmd, $newState);
-        $stateCmd->save();
+        //$stateCmd->save();
 
         $deviceCountCmd = $globalDevice->getCmd('info', 'count');
         $globalDevice->checkAndUpdateCmd($deviceCountCmd, $deviceCount);
         //$deviceCountCmd->event($deviceCount);
-        $deviceCountCmd->save();
+        //$deviceCountCmd->save();
         log::add('phone_detection', 'debug', 'updateGlobalDevice: state=' . $newState . '/nb1=' . $deviceCount . '/nbDevices=' .(count($devices) - 1));
     }
 
@@ -353,7 +351,7 @@ class phone_detection extends eqLogic
         }
 
         if ($i >= 5) {
-            log::add('phone_detection', 'error', 'Impossible de lancer le démon phone_detection, relancer le démon en debug et vérifiez la log', 'unableStartaemon');
+            log::add('phone_detection', 'error', __('Impossible de lancer le démon phone_detection, relancer le démon en debug et vérifiez la log', 'unableStartaemon', __FILE__));
             return false;
         }
 
@@ -444,9 +442,6 @@ class phone_detection extends eqLogic
             if (($last == '0' or time() - strtotime($last)>65)) {
                 $auto = $remote->getConfiguration('remoteDaemonAuto','0');
                 foreach ($allEqlogic as $eqLogic){
-                    //$rssicmd = $eqLogic->getCmd(null, 'rssi' . $remote->getRemoteName());
-                    //$eqLogic->checkAndUpdateCmd($rssicmd, -200);
-                    //$eqLogic->setCache('rssi' . $remote->getRemoteName(),-200);
                     $stateCmd = $eqLogic->getCmd(null, 'state_' . $remote->getRemoteName());
                     $eqLogic->checkAndUpdateCmd($stateCmd, 0);
                     $eqLogic->computePresence();
@@ -462,9 +457,6 @@ class phone_detection extends eqLogic
         $deamon_info = self::deamon_info();
         if ($deamon_info['state'] != 'ok'){
             foreach ($allEqlogic as $eqLogic){
-            //    $rssicmd = $eqLogic->getCmd(null, 'rssilocal');
-            //    $eqLogic->checkAndUpdateCmd($rssicmd, -200);
-            //    $eqLogic->setCache('rssilocal',-200);
                 $stateCmd = $eqLogic->getCmd(null, 'state_local');
                 $eqLogic->checkAndUpdateCmd($stateCmd, 0);
                 $eqLogic->computePresence();
@@ -530,6 +522,7 @@ class phone_detection extends eqLogic
             $stateCmd->setTemplate('mobile','line');
             $stateCmd->setEqLogic_id($this->getId());
             $stateCmd->save();
+            $this->checkAndUpdateCmd($stateCmd, 0);
         }
         if ($stateCmd->getConfiguration('returnStateValue') == 0 || $stateCmd->getConfiguration('returnStateTime') == 2){
             $stateCmd->setConfiguration('returnStateValue','');
@@ -538,14 +531,16 @@ class phone_detection extends eqLogic
         }
         foreach ($this->getCmd('info') as $cmd) {
             if (substr($cmd->getLogicalId(),0,6) == 'state_' && $cmd->getLogicalId() != 'state'){
-                $globalState += $cmd->execCmd();
+                $globalState += (int) ($cmd->execCmd() == 1);
             }
         }
-        if ($globalState > 0) {
-            $this->checkAndUpdateCmd($stateCmd, 1);
-        } else {
-            $this->checkAndUpdateCmd($stateCmd, 0);
-        }
+        log::add('phone_detection', 'debug', 'computePresence = ' . $globalState);
+        $this->checkAndUpdateCmd($stateCmd, ($globalState > 0 ? 1 : 0));
+        //if ($globalState > 0) {
+        //    $this->checkAndUpdateCmd($stateCmd, 1);
+        //} else {
+        //    $this->checkAndUpdateCmd($stateCmd, 0);
+        //}
     }
 
     /// END REMOTE ANTENNAS
@@ -563,6 +558,12 @@ class phone_detection extends eqLogic
             $pid = intval(trim(file_get_contents($pid_file)));
             system::kill($pid);
         }
+
+        // Check if we have a local daemon which is supposed to run
+        if (config::byKey('noLocal', 'phone_detection', 0) == 1){
+            return;
+        }
+        
         $i = 0;
         while ($i < 5) {
             $deamon_info = self::deamon_info();
@@ -573,7 +574,7 @@ class phone_detection extends eqLogic
             $i++;
         }
         if ($i >= 5) {
-            log::add('phone_detection', 'error', 'Impossible d\'arrêter le démon phone_detection, tuons-le');
+            log::add('phone_detection', 'error', __('Impossible d\'arrêter le démon phone_detection, tuons-le', __FILE__));
             system::kill('phone_detectiond.py');
         }
     }

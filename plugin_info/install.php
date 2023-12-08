@@ -20,7 +20,6 @@ function phone_detection_update() {
         $phone_detection->save();
     }
     
-    message::add('phone_detection','Pensez a mettre a jour vos antennes et relancer leurs dépendances si besoin ...');
 
     $daemonInfo = phone_detection::deamon_info();
     if ($daemonInfo['state'] == 'ok') {
@@ -37,13 +36,16 @@ function phone_detection_update() {
 
     if (config::byKey('allowUpdateAntennas','phone_detection',0) == 1) {
         log::add('phone_detection','info','Mise a jour des fichiers de toutes les antennes');
+        message::add('phone_detection','Mise a jour automatique de vos antennes de fichiers sur vos antennes, relancer leurs dépendances si besoin ...');
         phone_detection::send_allremotes();
+    } else {
+        message::add('phone_detection','Pensez a mettre a jour vos antennes et relancer leurs dépendances si besoin ...');
     }
 
     phone_detection::dependancy_install();
 
     message::removeAll('Phone_detection');
-    message::add('Phone_detection', '{{Mise a jour du plugin Phone_detection terminée, vous êtes en version }}' . phone_detection::getVersion() . '.', null, null);
+    message::add('Phone_detection', 'Mise a jour du plugin Phone_detection terminée, vous êtes en version' . phone_detection::getVersion());
 
     phone_detection::deamon_start();
 

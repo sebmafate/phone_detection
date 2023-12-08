@@ -161,10 +161,11 @@ $eqLogics = eqLogic::byType($plugin->getId());
 				<div class="table-responsive">
 					<table id="table_cmd" class="table table-bordered table-condensed">
 						<thead>
-							<tr>
-								<th>{{Id}}</th>
+						<tr>
 								<th>{{Nom}}</th>
-								<th>{{Historique}}</th>
+								<th>{{Type}}</th>
+								<th>{{Options}}</th>
+								<th>{{Etat}}</th>
 								<th>{{Action}}</th>
 							</tr>
 						</thead>
