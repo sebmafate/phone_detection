@@ -6,6 +6,18 @@ lang: fr_FR
 
 # Changelog
 
+## 2023-12-26 v2.2.0
+
+Une nouvelle approche pour eviter les problemes bluetooth, principalement vu sous debian 11 sur raspberry. Je n'avais pas ce probleme sous debian 10.
+Au lieu d'avoir une approche multi-thread (un par mobile), les mobiles sont maintenant traites dans un seul thread, avec des appels asynchrones.
+Cela se base sur la class aiobtname de François Wautier. Avec cette nouvelle approche, le monitoring de telephone est beaucoup plus stable, je
+n'ai plus besoin de redemarrer le deamon phone_detection, ou de rebooter mes antennes a intervals reguliers.
+
+On se degage de pybluez, et de l'api bluez avec cette version, qui utilise directement les libraries python3 et les sockets HCI pour communiquer
+avec les mobiles.
+
+Il n'y a pas d'installation particuliere de dependances. Installer le plugin de maniere classique, et mettez a jour vos antennes.
+
 ## 2023-11-03 v2.1.0
 
 Pile un an apres la derniere modification majeure :)
