@@ -80,17 +80,16 @@ switch ($action) {
         break;
 
     case "heartbeat":
-        $source   = $results['source'];
-        $version  = $results['version'];
-        $count    = $results['count'];
-        $monitor  = $results['monitor'];        
-        log::add('phone_detection','debug','This is a heartbeat from antenna ' . $source . ' version=' . $version . ' (count=' . $count . '/monitor=' . $monitor);
+        $source  = $results['source'];
+        $version = $results['version'];
+        $alive   = $results['alive'];        
+        log::add('phone_detection','debug','This is a heartbeat from antenna ' . $source . ' version=' . $version . ' alive=' . $alive);
         if ($source != 'local'){
             foreach ($antennas as $antenna){
                 if ($antenna->getRemoteName() == $source){
                     $antenna->setCache('version', $version);
-                    if ($count < $monitored) {
-                        log::add('phone_detection', 'warn', 'Arret de l\'antenne ' . $antenna->getRemoteName() . ' because count=' . $count . '/monitor=' . $monitor);
+                    if ($alive == 0) {
+                        log::add('phone_detection', 'error', 'Arret de l\'antenne ' . $antenna->getRemoteName() . ' because alive=' . $alive);
                         phone_detection::stopremote($antenna->getId());
                         message::add('phone_detection', 'Arret de l\'antenne ' . $antenna->getRemoteName() . ' suite a un probleme reporte par l\'antenne.');
                     } else {

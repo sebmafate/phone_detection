@@ -4,7 +4,24 @@ phone_detectiond daemon
 created by Sebastien FERRAND
 sebastien.ferrand@vbmaf.net
 04/11/2019
+
+2021/05/25: Benoit Rech 
+support multi-antennas. Each antenna sends the presence information
+to plugin phone_dectection that runs on jeedom. Jeedom consolidates the information from the 
+different antennas to build the "global" device status.
+
+2022/01/03: Benoit Rech
+Use pybluez instead of system calls which can cause locks on raspberry
+Install hcidump to be able to monitor hci frame directly on the antenna.
+
+2023/12/13: Benoit Rech
+Do not use system calls, or pyBluez because there are lots of issues on Debian 11 (bullseye).
+Rely on a class (aiobtname.py) developped by François Wautier, which uses direct HCI socket 
+with the system, and asynchonous calls that avoid using multi-threads. 
+A request is sent for each mobile, and the mobile's reponses are parsed on the fly.
+The polling interval is also more accurate, as well as the monitoring of the 'unreachable' threshold.
 '''
+
 import logging
 import os
 import sys
@@ -15,41 +32,43 @@ import argparse
 import socketserver
 import requests
 import threading
-import uuid
-import subprocess
 import collections
 import gc
+import re
+import asyncio as aio
+import aiobtname
+from math import gcd
+from functools import partial
 
-import bluetooth
-import bluetooth._bluetooth as _bt
-
-from multiprocessing.dummy import Pool as ThreadPool
 
 from datetime import date, datetime, timedelta
 
 BASE_PATH = os.path.join(os.path.dirname(__file__), '..', '..', '..', '..')
 BASE_PATH = os.path.abspath(BASE_PATH)
 PLUGIN_NAME = "phone_detection"
-DEVICES = {}
-THREADS = {}
 DATEFORMAT = '%Y-%m-%d %H:%M:%S'
 LOGLEVEL = logging.WARNING;
+
+DEVICES = {}
 
 """
 Classe permettant de regrouper les informations d'un téléphone
 """
 class Phone:
     def __init__(self, macAddress, deviceId):
-        self.macAddress = macAddress
+        self.macAddress = macAddress.upper()
         self.deviceId = deviceId
         self.humanName = ''
         self.isReachable = False
+        self.isReachableLastPolling = False
         self.lastStateDate = datetime.utcnow()
         self.lastRefreshDate = datetime.utcnow()
+        self.lastPollDate = datetime.utcnow() - timedelta(hours=1)
         self.mustUpdate = False
 
     def setReachable(self):
         self.lastStateDate = datetime.utcnow()
+        self.isReachableLastPolling = True
         if not self.isReachable:
             self.isReachable = True
             logging.info('Set {}\'s phone present'.format(self.humanName))
@@ -61,10 +80,12 @@ class Phone:
 
     def setNotReachable(self):
         thresholdDate = self.lastStateDate + timedelta(seconds=int(args.absentThreshold))
-        logging.debug('[{}]: lastStateDate: {}'.format(int(self.deviceId), self.lastStateDate))
-        logging.debug('[{}]: thresholdDate: {}'.format(int(self.deviceId), thresholdDate))
-        logging.debug('[{}]: datetime.utcnow(): {}'.format(int(self.deviceId), datetime.utcnow()))
-        logging.debug('[{}]: isReachable: {}, is datetime.utcnow() > thresholdDate ? {}'.format(int(self.deviceId), self.isReachable, datetime.utcnow() > thresholdDate))
+        logging.debug('[{}]: lastStateDate: {}'.format(self.deviceId, self.lastStateDate))
+        logging.debug('[{}]: thresholdDate: {}'.format(self.deviceId, thresholdDate))
+        logging.debug('[{}]: datetime.utcnow(): {}'.format(self.deviceId, datetime.utcnow()))
+        logging.debug('[{}]: isReachableLastPolling: {}'.format(self.deviceId, self.isReachableLastPolling))
+        logging.debug('[{}]: isReachable: {}, is datetime.utcnow() > thresholdDate ? {}'.format(self.deviceId, self.isReachable, datetime.utcnow() > thresholdDate))
+        self.isReachableLastPolling = False
         if self.isReachable and datetime.utcnow() > thresholdDate:
             self.isReachable = False
             self.lastStateDate = datetime.utcnow()
@@ -94,115 +115,165 @@ class Phone:
         return obj
 
 """
-Class gérant le thread de détection pour 1 device
+Class gérant le thread de détection pour l'ensemble des telephones
 """
-class PhoneDetection:
-    def __init__(self, device, btController, interval, present_interval, callback):
-        self.device = device
+class PhonesDetection:
+    def __init__(self, btController, absentInterval, presentInterval, callback):
         self.btController = btController
-        self.interval = interval
-        self.present_interval = present_interval
+        self.absentInterval = absentInterval
+        self.presentInterval = presentInterval
         self._stop = False
         self.callback = callback
-        self.btRetries = 0
+        self.macList = []
+        self.nbConnectionFailure = 0
 
     def start(self):
-        logging.info('Start thread detection for {} [{}]'.format(self.device.humanName, self.device.macAddress))
 
-        deviceStatus = self.callback.getDeviceStatus(int(self.device.deviceId))
-        logging.debug('Jeedom {} device status: {}'.format(self.device.deviceId, deviceStatus))
-        self.device.isReachable = deviceStatus
+        for device in DEVICES.values():
+            logging.info('Starting monitoring for {} [{}]'.format(device.humanName, device.macAddress))
+            deviceStatus = self.callback.getDeviceStatus(device.deviceId)
+            logging.debug('Jeedom {} device status: {}'.format(device.deviceId, deviceStatus))
+            if deviceStatus == True:
+                device.setReachable()
+            else:
+                device.setNotReachable()
+
         self._stop = False
         self.t = threading.Thread(target=self.__run)
         self.t.daemon = True
         self.t.start()
 
     def stop(self, waitForStop = True):
-        logging.info('Stop thread detection for {} [{}]'.format(self.device.humanName, self.device.macAddress))
+        for device in DEVICES.values():
+            logging.info('Stop monitoring for {} [{}]'.format(device.humanName, device.macAddress))
+
         self._stop = True
         if waitForStop:
             self.t.join()
             del self.t
             gc.collect()
 
-    def isAlive(self):
-        return (True == self.t.is_alive())
+    def isMonitoringAlive(self):
+        return int(self.t.is_alive())
 
-    def GetPhoneInformation(self):
-        logging.debug('Get phone information {}'.format(self.device.deviceId))
-        if not bluetooth.is_valid_address(self.device.macAddress):
-            raise Exception('Phone not monitored because invalid mac address')
+    def isValidMacAddress(sef, mac):
+        allowed = re.compile(r"""
+                         (
+                             ^([0-9A-F]{2}[-]){5}([0-9A-F]{2})$
+                            |^([0-9A-F]{2}[:]){5}([0-9A-F]{2})$
+                         )
+                         """,
+                         re.VERBOSE|re.IGNORECASE)
+
+        return re.search(allowed, mac)
+
+    def isPollingRequested(self, phone):
+        if phone.isReachableLastPolling:
+            nextPollDate = phone.lastPollDate + timedelta(seconds=self.presentInterval)
+        else:
+            nextPollDate = phone.lastPollDate + timedelta(seconds=self.absentInterval)
+
+        return (datetime.utcnow() >= nextPollDate)
+
+    def processResponse(self, data):
+        logging.debug('Received response from device: {}: {}'.format(data['mac'], data['name']))
+        mac = data['mac'].upper()
+        if mac in self.macList:
+            self.macList.remove(mac)
+        for device in DEVICES.values():
+            if device.macAddress == mac:
+                logging.info('[{}] {} ({}) is reachable'.format(device.deviceId, device.macAddress, device.humanName))            
+                if device.setReachable() == True:
+                    #logging.info('{} status has changed to \'present\'! Notify Jeedom.'.format(device.humanName))
+                    if self.callback.setDeviceStatus(device.deviceId, device.isReachable):
+                        device.mustUpdate = False
+                break
+
+    async def GetPhonesInformation(self):
 
         try:
-            result = subprocess.run(['hcitool', '-i', self.btController, 'name', self.device.macAddress], stdout = subprocess.PIPE)
-            # check_returncode will generate a CallProcessError exception if return_code is not 0.
-            result.check_returncode()
-            if result.stdout:
-               logging.debug('[{}] is present'.format(self.device.deviceId))
-               self.device.setReachable()
-            else:
-                logging.debug('[{}] is absent'.format(self.device.deviceId))
-                self.device.setNotReachable()        
-            self.btRetries = 0            
-        except subprocess.CalledProcessError as e:            
-            logging.error('Unable to get status for {}, cause (bluetooth device {}, error code {}: {})'.format(self.device.deviceId, self.btController, e.args[0], e.args[1]))
+            #First create and configure a raw socket
+            sock = aiobtname.create_bt_socket(int(self.btController))
+            self.nbConnectionFailure = 0
+        except Exception as e:
+            logging.error('Impossible de se connecter au bluetooth hci{}, exception: {}: {}'.format(self.btController, type(e), e))
+            self.nbConnectionFailure = self.nbConnectionFailure + 1
+            if self.nbConnectionFailure > 5:
+                self.stop(False)
+            return
+
+        conn = None
+        self.macList = []
+        for device in DEVICES.values():
+            if self.isValidMacAddress(device.macAddress) and self.isPollingRequested(device):
+                logging.debug('Adding [{}]: {} ({})'.format(device.deviceId, device.macAddress, device.humanName))
+                self.macList.append(device.macAddress)
+                device.lastPollDate = datetime.utcnow()
+
+        logging.debug('Number of devices to poll: {}'.format(len(self.macList)))
+        if len(self.macList) != 0:
             try:
-                subprocess.check_call('sudo hciconfig {} reset'.format(args.device), shell=True)
-            except subprocess.CalledProcessError as e:
-                self.btRetries += 1
-                if self.btRetries > 5:
-                    logging.critical('Unable to reset the hci driver {}. Stopping this thread !!!'.format(args.device))                    
-                    self.stop(False)
-        #try:
-            #sock = _bt.hci_open_dev(self.btController)
-            #try:
-            #    name = _bt.hci_read_remote_name (sock, self.device.macAddress, 5192)
-            #    logging.debug('{} is present'.format(self.device.deviceId))
-            #    self.device.setReachable()
-            #except _bt.error as e:
-            #    if e.args[0] == 110:
-            #        #logging.debug('BT exception raised: error code {}: {}'.format(e.args[0], e.args[1]))
-            #        logging.debug('{} is absent'.format(self.device.deviceId))
-            #        self.device.setNotReachable()
-            #    else:
-            #        raise e
-        #except _bt.error as e:
-        #    logging.error('Unable to get status for {}, cause (bluetooth device {}, error code {}: {})'.format(self.device.deviceId, self.btController, e.args[0], e.args[1]))
-        #    if subprocess.call('sudo hciconfig {} reset'.format(args.device), shell=True) != 0:
-        #        self.btRetries += 1
-        #        if self.btRetries > 5:
-        #            logging.critical('Unable to reset the hci driver {}. Stopping this thread !!!'.format(args.device))                    
-        #            self.stop(False)
-        #    else:
-        #        self.btRetries = 0
-        #finally:
-        #    sock.close()            
+                #create a connection with the raw socket
+                event_loop = aio.get_event_loop()
+                fac = event_loop._create_connection_transport(sock, aiobtname.BTNameRequester, None, None)
+                conn, btctrl = await event_loop.create_task(fac)
+                btctrl.process = self.processResponse
+
+                timetowait = 5
+                retries = 2
+                request = partial(btctrl.request, self.macList)
+                await aio.sleep(0.1)
+                for i in range(retries):
+                    logging.debug('Sending bluetooth name request to {} devices (try {}/{})'.format(len(self.macList), i + 1, retries))
+                    request()
+                    # Time for the devices to reply
+                    await aio.sleep(timetowait)
+            except Exception as e:
+                logging.info('Exception: {}/{}'.format(type(e), e))
+                logging.error('Erreur {} durant le monitoring des devices'.format(e))
+
+            finally:
+                if conn is not None:
+                    conn.close()
+
+            # Process the list of remaining mac address
+            for mac in self.macList:
+                logging.debug('No response for mac {}'.format(mac))
+                for device in DEVICES.values():
+                    if mac == device.macAddress:
+                        if device.setNotReachable() == True:
+                            #logging.info('{} status has changed to \'absent\'! Notify Jeedom.'.format(device.humanName))
+                            if self.callback.setDeviceStatus(device.deviceId, device.isReachable):
+                                device.mustUpdate = False
+
 
     def __run(self):
-        sleepTime = self.interval
+        sleepTime = gcd(self.absentInterval, self.presentInterval)
+        logging.debug('sleeptime: {} GCD({}, {})'.format(sleepTime, self.absentInterval, self.presentInterval))
         while not self._stop:
+            startTime = time.time()
+            event_loop = aio.new_event_loop()
             try:
-                self.GetPhoneInformation()
-                if self.device.mustUpdate:
-                    logging.info('{} status has changed to \'{}\'! Notify Jeedom.'.format(self.device.humanName, ('absent','present')[self.device.isReachable]))
-                    if self.callback.setDeviceStatus(int(self.device.deviceId), self.device.isReachable):
-                        self.device.lastStateDate = datetime.utcnow()
-                        self.device.mustUpdate = False
-                else:
-                    refreshDate = self.device.lastRefreshDate + timedelta(seconds=300)
+                coro = self.GetPhonesInformation()
+                event_loop.run_until_complete(coro)
+                # Process with periodic refresh
+                for device in DEVICES.values():
+                    refreshDate = device.lastRefreshDate + timedelta(seconds=300)
                     if datetime.utcnow() > refreshDate:
-                        logging.debug('{}: periodic refresh (300s) --> status: {}'.format(self.device.humanName, self.device.isReachable))
-                        self.device.lastRefreshDate = datetime.utcnow()
-                        self.callback.setDeviceStatus(int(self.device.deviceId), self.device.isReachable)
+                        logging.debug('{}: periodic refresh (300s) --> status: {}'.format(device.humanName, device.isReachable))
+                        device.lastRefreshDate = datetime.utcnow()
+                        self.callback.setDeviceStatus(device.deviceId, device.isReachable)
             except Exception as e:
-                logging.error('Unknow exception {} while processing mobile {} [{}]'.format(e, self.device.humanName, self.device.macAddress))
+                logging.error('Unknow exception {} while monitoring mobiles'.format(e))
 
-            if self.device.isReachable:
-                sleepTime = self.present_interval
-            else:
-                sleepTime = self.interval
+            finally:
+                event_loop.close()
+                endTime = time.time()
 
-            time.sleep(sleepTime)
+            elapsedTime = endTime - startTime
+            remainingTime = max(0, sleepTime - elapsedTime)
+            logging.debug('elapsed time {}, next loop in {} seconds'.format(elapsedTime, remainingTime))
+            time.sleep(remainingTime)
 
 """
 Convertisseur Phone <-> json
@@ -259,13 +330,9 @@ class JeedomCallback:
             return False
         return True
 
-    def heartbeat(self, version):
-        aliveCount = 0
-        for key in THREADS:
-            isAlive = THREADS[key].isAlive()
-            logging.debug("\t==> {}: is_alive: {}".format(THREADS[key].device.humanName, isAlive))
-            aliveCount = aliveCount + isAlive
-        r = self.__send_now({'action':'heartbeat', 'version': version, 'alive': aliveCount, 'monitor': len(THREADS.keys())})
+    def heartbeat(self, isMonitoringAlive, version):
+        r = self.__send_now({'action':'heartbeat', 'version': version, 'alive': isMonitoringAlive})
+        #r = self.__send_now({'action':'heartbeat', 'version': version, 'alive': 1, 'monitor': isMonitoringAlive})
         if not r or not r.get('success'):
             logging.error('Error during heartbeat')
             return False
@@ -302,13 +369,13 @@ class JeedomCallback:
             return None
         # values = json.loads(devices)
         r = {}
-        for key in devices["value"]:
-            item = devices["value"][key]
-            r[key] = Phone(item["macAddress"], item["id"])
+        for key in devices['value']:
+            item = devices['value'][key]
+            r[key] = Phone(item['macAddress'], item['id'])
             r[key].humanName = item['name']
-            r[key].isReachable = item["state"]
+            r[key].isReachable = item['state']
+            r[key].isReachableLastPolling = False
             try:
-                #r[key].lastStateDate = datetime.fromisoformat(item['lastValueDate'])
                 r[key].lastStateDate = datetime.strptime(item['lastValueDate'], DATEFORMAT)
             except:
                 r[key].lastStateDate = datetime.utcnow()
@@ -343,28 +410,23 @@ class JeedomHandler(socketserver.BaseRequestHandler):
 
             if mid in DEVICES:
                 # update
-                logging.debug('Update device in device.json')
+                logging.debug('Update device in device: {}'.format(mid))
                 DEVICES[mid].humanName = name
-                DEVICES[mid].deviceId = mid
+                DEVICES[mid].deviceId = int(mid)
                 DEVICES[mid].macAddress = macAddress
                 response['result'] = 'Update OK'
             else:
                 # insert
-                logging.debug('Add new device in device.json')
+                logging.debug('Add new device in device: {}'.format(mid))
                 DEVICES[mid] = Phone(macAddress, mid)
                 DEVICES[mid].humanName = name
-                THREADS[mid] = PhoneDetection(DEVICES[mid], BTCONTROLLER, INTERVAL, PRESENTINTERVAL, jc)
                 response['result'] = 'Insert OK'
-                THREADS[mid].start()
 
         if action == 'remove_device':
             mid = args[0]
             if mid in DEVICES:
                 del DEVICES[mid]
-                if mid in THREADS:
-                    THREADS[mid].stop(False)
-                    del THREADS[mid]
-                response['result'] = 'Remove OK'
+            response['result'] = 'Remove OK'
 
         if action == 'logdebug':
             logging.debug('Dynamically change log to debug')
@@ -400,9 +462,10 @@ class JeedomHandler(socketserver.BaseRequestHandler):
 Class gérant le threadle heartbeat
 """
 class HeartbeatThread:
-    def __init__(self, callback, version):
+    def __init__(self, jeedomCallback, monitoringCallback, version):
         self._stop = False
-        self.callback = callback
+        self.jeedomCallback = jeedomCallback
+        self.monitoringCallback = monitoringCallback
         self.version = version
 
     def start(self):
@@ -423,7 +486,8 @@ class HeartbeatThread:
     def __run(self):
         sleepTime = 30
         while not self._stop:
-            self.callback.heartbeat(self.version)
+            isMonitoringAlive = self.monitoringCallback.isMonitoringAlive()
+            self.jeedomCallback.heartbeat(isMonitoringAlive, self.version)
             time.sleep(sleepTime)
 
 
@@ -451,11 +515,9 @@ shutdown: nettoie les ressources avant de quitter
 """
 def shutdown():
     logging.info("=========== Shutdown ===========")
-    logging.info("Stopping all threads")
-    for key in THREADS:
-        logging.info("\t==> {}".format(THREADS[key].device.humanName))
-        THREADS[key].stop(False)
-    HEARTBEAT.stop(False)
+    logging.info("Stopping monitoring and heartbeat threads")
+    monitoringThread.stop(False)
+    heartbeatThread.stop(False)
     logging.info("Shutting down local server")
     server.shutdown()
     server.server_close()
@@ -495,11 +557,13 @@ urllib3_logger.setLevel(logging.CRITICAL)
 # Recupere la version du plugin
 try:
     with open(os.path.dirname(__file__) + '/version.txt', 'r') as fp:
-        version = fp.read();
+        version = fp.read()
+        version = version.rstrip('\r\n')
         fp.close()
 except FileNotFoundError:
     version = '?.?.?'
 
+logging.info('=========')
 logging.info('Start {}d'.format(PLUGIN_NAME))
 logging.info('Version: {}'.format(version))
 logging.info('Log level : {}'.format(args.loglevel))
@@ -510,29 +574,20 @@ logging.info('PID file : {}'.format(args.pidfile))
 logging.info('Device : {}'.format(args.device))
 logging.info('Callback : {}'.format(args.callback))
 logging.info('Daemon Name : {}'.format(args.daemonname))
-logging.info('Interval : {}'.format(args.interval))
-logging.info('Present Interval : {}'.format(args.present_interval))
-logging.info('AbsentThreshold: {}'.format(args.absentThreshold))
+logging.info('Polling Interval when device is Absent : {}'.format(args.interval))
+logging.info('Polling Interval when device is Present : {}'.format(args.present_interval))
+logging.info('Threshold to consider device Absent: {}'.format(args.absentThreshold))
 logging.info('Python version : {}'.format(sys.version))
 
 _pidfile = args.pidfile
 _sockfile = args.socket
 _apikey = args.apikey
 
-BTCONTROLLER = args.device
-#BTCONTROLLER = _bt.hci_devid(args.device)
-#if BTCONTROLLER == -1:
-#    # The controller doesn't exist or cannot be used. Trying to reset the controller
-#    logging.error('Invalid bluetooth controller or unable to connect to {}, resetting the controller'.format(args.device))
-#    subprocess.call('sudo hciconfig {} reset'.format(args.device), shell=True)
-#    BTCONTROLLER = _bt.hci_devid(args.device)
-#    if BTCONTROLLER == -1:
-#        logging.critical('Invalid bluetooth controller {}'.format(args.device))
-#        sys.exit(1)
-#logging.info('Using bluetooth controller {}'.format(args.device))
+btController = args.device[3:]
+logging.info('Using bluetooth controller {} (id={})'.format(args.device, btController))
 
-INTERVAL = int(args.interval)
-PRESENTINTERVAL = int(args.present_interval)
+absentInterval = int(args.interval)
+presentInterval = int(args.present_interval)
 
 # Configuration du handler pour intercepter les commandes
 # kill -9 et kill -15
@@ -547,13 +602,9 @@ with open(args.pidfile, 'w') as fp:
     fp.close()
 
 # Configure et test le callback vers jeedom
-jc = JeedomCallback(args.apikey, args.callback, args.daemonname) # , int(args.interval), int(args.present_interval), args.device
+jc = JeedomCallback(args.apikey, args.callback, args.daemonname)
 if not jc.test():
     sys.exit(1)
-
-# Demarrage des heartbeat vers jeedom
-HEARTBEAT = HeartbeatThread(jc, version)
-HEARTBEAT.start()
 
 # Démarre le serveur qui écoute les requests de jeedom
 if args.socket != None and len(args.socket) > 0:
@@ -586,9 +637,11 @@ DEVICES = jc.getDevices()
 
 jc.updateGlobalDevice()
 
-# Démarrage des threads
-THREADS = {}
+# Démarrage du thread de monitoring des mobiles
+monitoringThread = PhonesDetection(btController, absentInterval, presentInterval, jc)
+monitoringThread.start()
 
-for key in DEVICES:
-    THREADS[key] = PhoneDetection(DEVICES[key], BTCONTROLLER, INTERVAL, PRESENTINTERVAL, jc)
-    THREADS[key].start()
+# Demarrage des heartbeat vers jeedom
+heartbeatThread = HeartbeatThread(jc, monitoringThread, version)
+heartbeatThread.start()
+
