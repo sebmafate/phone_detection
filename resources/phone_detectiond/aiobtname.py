@@ -23,7 +23,11 @@
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
 # IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 
-import socket, asyncio
+
+# Modified by Benoit Rech, to add Cancel request, and sleep between each request sent.
+# add rename default_process to processResponse, and add processTimeout.
+
+import socket, asyncio, time
 from struct import pack, unpack
 
 
@@ -32,6 +36,7 @@ HCI_COMMAND = 0x01
 HCI_EVENT = 0x04
 
 CMD_NAME_REQUEST = 0x1904 #mixing the OGF in with that HCI shift
+CMD_NAME_CANCEL  = 0x1A04 #mixing the OGF in with that HCI shift
 
 
 def create_bt_socket(interface=0):
@@ -77,10 +82,13 @@ class BTNameRequester(asyncio.Protocol):
         self.transport = None
         self.smac = None
         self.sip = None
-        self.process = self.default_process
+        self.processResponse = self.default_processResponse
+        self.processTimeout = self.default_processTimeout
 
     def connection_made(self, transport):
         self.transport = transport
+        self.send_reset()
+
 
     def connection_lost(self, exc):
         super().connection_lost(exc)
@@ -88,7 +96,14 @@ class BTNameRequester(asyncio.Protocol):
     def request(self, mac_addr):
         """Send Name request, mac_addr is a list of mac addresses"""
         for addr in mac_addr:
+            time.sleep(0.050)
             self.send_name_request(addr)
+
+    def cancel(self, mac_addr):
+        """Send Name request, mac_addr is a list of mac addresses"""
+        for addr in mac_addr:
+            time.sleep(0.050)
+            self.send_name_cancel(addr)
 
     def send_name_request(self,mac_addr):
         '''Sending ARP request for given IP'''
@@ -103,10 +118,9 @@ class BTNameRequester(asyncio.Protocol):
             pack('!B',0x0a),
             #MAC address
             int(mac_addr.replace(":",""),16).to_bytes(6,"little"),
-            #Repeat
-            pack('!B',0x02),
-            pack('!B',0x00),
-            pack('!B',0x00),
+            pack('!B',0x02),  # Page scan repetition mode R2 (0x02)
+            pack('!B',0x00),  # Page scan mode; Mandatory (0x00)
+            pack('!B',0x00),  # Clock offset (0x0000)
             pack('!B',0x00)
         ]
 
@@ -114,11 +128,42 @@ class BTNameRequester(asyncio.Protocol):
 
     def data_received(self, packet):
         resu=unpack("ssss",packet[:4])
-        if resu[0]==b'\x04' and resu[1]==b'\x07' and resu[3]==b'\x00': #Essentially a successful answer
+        if resu[0]==b'\x04' and resu[1]==b'\x07': # Basically, an answer for our request
             raw_mac = packet[4:10]
             mac = ':'.join(a + b for a, b in list(zip(*[iter(raw_mac.hex())]*2))[::-1])
-            name=packet[10:].strip(b'\x00').decode()
-            self.process({"mac":mac,"name":name})
+            if resu[3]==b'\x00': #Essentially a successful answer
+                name=packet[10:].strip(b'\x00').decode()
+                self.processResponse({"mac":mac,"name":name})
+            elif resu[3]==b'\x04': #Page timeout
+                self.processTimeout({"mac": mac, "name": ''})
 
-    def default_process(self,data):
+
+    def send_name_cancel(self, mac_addr):
+
+        # make the frame :
+        frame = [
+            ### HCI header###
+            # Destination MAC address  :
+            pack('!B', HCI_COMMAND),
+            pack('!H', CMD_NAME_CANCEL),
+            #Length... we know it's 6
+            pack('!B',0x06),
+            #MAC address
+            int(mac_addr.replace(":",""),16).to_bytes(6,"little"),
+        ]
+
+        self.transport.write(b''.join(frame)) # Sending       
+
+
+    def send_reset(self):
+        # The OGF (Opcode Group Field) for the reset command is 0x03.
+        # The OCF (Opcode Command Field) for the reset command is 0x0003.
+        # The complete command opcode is thus 0x03 << 10 | 0x0003 = 0x0C03
+        reset_command = b'\x03\x0C\x00\x00'
+        self.transport.write(reset_command) # Sending
+
+    def default_processResponse(self,data):
+        pass
+
+    def default_processTimeout(self,data):
         pass

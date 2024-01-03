@@ -6,6 +6,11 @@ lang: fr_FR
 
 # Changelog
 
+## 2024-01-02 v2.2.1
+
+Correction de bugs suite au passage en 2.2.0. Certains mobiles ne sont plus detectes, en fonction de differentes
+conditions (ordre de polling, presence ou non du mobile, delai de reponse, ...).
+
 ## 2023-12-26 v2.2.0
 
 Une nouvelle approche pour eviter les problemes bluetooth, principalement vu sous debian 11 sur raspberry. Je n'avais pas ce probleme sous debian 10.

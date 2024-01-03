@@ -29,12 +29,14 @@ import time
 import signal
 import json
 import argparse
+import subprocess
 import socketserver
 import requests
 import threading
 import collections
 import gc
 import re
+import random
 import asyncio as aio
 import aiobtname
 from math import gcd
@@ -48,6 +50,7 @@ BASE_PATH = os.path.abspath(BASE_PATH)
 PLUGIN_NAME = "phone_detection"
 DATEFORMAT = '%Y-%m-%d %H:%M:%S'
 LOGLEVEL = logging.WARNING;
+PAGE_TIMEOUT=2500
 
 DEVICES = {}
 
@@ -182,12 +185,24 @@ class PhonesDetection:
             self.macList.remove(mac)
         for device in DEVICES.values():
             if device.macAddress == mac:
-                logging.info('[{}] {} ({}) is reachable'.format(device.deviceId, device.macAddress, device.humanName))            
+                logging.debug('[{}] {} ({}) is reachable'.format(device.deviceId, device.macAddress, device.humanName))            
                 if device.setReachable() == True:
-                    #logging.info('{} status has changed to \'present\'! Notify Jeedom.'.format(device.humanName))
                     if self.callback.setDeviceStatus(device.deviceId, device.isReachable):
                         device.mustUpdate = False
                 break
+
+    def processTimeout(self, data):
+        logging.debug('Received timeout for device: {}'.format(data['mac']))
+        mac = data['mac'].upper()
+        if mac in self.macList:
+            self.macList.remove(mac)
+        for device in DEVICES.values():
+            if device.macAddress == mac:
+                logging.debug('[{}] {} ({}) is unreachable'.format(device.deviceId, device.macAddress, device.humanName))            
+                if device.setNotReachable() == True:
+                    if self.callback.setDeviceStatus(device.deviceId, device.isReachable):
+                        device.mustUpdate = False
+                break        
 
     async def GetPhonesInformation(self):
 
@@ -212,14 +227,17 @@ class PhonesDetection:
 
         logging.debug('Number of devices to poll: {}'.format(len(self.macList)))
         if len(self.macList) != 0:
+            # Randomize the order of the requests in the list.
+            random.shuffle(self.macList)
             try:
                 #create a connection with the raw socket
                 event_loop = aio.get_event_loop()
                 fac = event_loop._create_connection_transport(sock, aiobtname.BTNameRequester, None, None)
                 conn, btctrl = await event_loop.create_task(fac)
-                btctrl.process = self.processResponse
+                btctrl.processResponse = self.processResponse
+                btctrl.processTimeout = self.processTimeout
 
-                timetowait = 5
+                timetowait = 5.000  # pagetimeout is 2500 slots (1562.50 ms)
                 retries = 2
                 request = partial(btctrl.request, self.macList)
                 await aio.sleep(0.1)
@@ -228,6 +246,11 @@ class PhonesDetection:
                     request()
                     # Time for the devices to reply
                     await aio.sleep(timetowait)
+
+                #if len(self.macList) != 0:
+                #    cancel = partial(btctrl.cancel, self.macList)
+                #    cancel()
+
             except Exception as e:
                 logging.info('Exception: {}/{}'.format(type(e), e))
                 logging.error('Erreur {} durant le monitoring des devices'.format(e))
@@ -237,14 +260,12 @@ class PhonesDetection:
                     conn.close()
 
             # Process the list of remaining mac address
+            await aio.sleep(1)
             for mac in self.macList:
-                logging.debug('No response for mac {}'.format(mac))
+                logging.warning('No response for mac {}'.format(mac))
                 for device in DEVICES.values():
                     if mac == device.macAddress:
-                        if device.setNotReachable() == True:
-                            #logging.info('{} status has changed to \'absent\'! Notify Jeedom.'.format(device.humanName))
-                            if self.callback.setDeviceStatus(device.deviceId, device.isReachable):
-                                device.mustUpdate = False
+                        device.isReachableLastPolling = False
 
 
     def __run(self):
@@ -531,6 +552,47 @@ def shutdown():
     logging.info("Exit 0")
     logging.info("=================================")
 
+
+def setBluetoothPageTimeout(interface, timeout):
+
+    if subprocess.call('sudo hciconfig {} pageto {}'.format(args.device, timeout), shell=True) != 0:
+        logging.error('Unable to set PageTimeout to {} for controller hci{}'.format(interface, timeout))
+        return -1
+
+    logging.info('PageTimeout set to {}s for controller hci{}.'.format(timeout * 0.000625, interface))
+    return 0
+
+#    # Convert the timeout to a little-endian byte representation
+#    timeout_bytes = timeout.to_bytes(2, byteorder='little')
+#    
+#    # HCI Command Packet structure:
+#    # - Type: 1 byte (0x01 for Command)
+#    # - Opcode: 2 bytes (OGF | OCF)
+#    # - Length: 1 byte (Length of command parameters)
+#    # - Parameters: Variable length
+#    hci_socket = None
+#    try:
+#        # Create an HCI socket
+#        hci_socket = socket.socket(socket.AF_BLUETOOTH, socket.SOCK_RAW, socket.BTPROTO_HCI)
+#
+#        # Bind the socket to any Bluetooth device (BDADDR_ANY) and any port (0)
+#        hci_socket.bind((interface,))
+#
+#        # Set the Page Timer to 20 seconds (assuming a 0.625 ms unit)
+#        command = b'\x01\x46\x04' + timeout_bytes
+#        hci_socket.send(command)
+#
+#        logging.info('PageTimeout set to {}s for controller hci{}.'.format(timeout * 0.000625, interface))
+#    
+#    except Exception as e:
+#        logging.error('Unable to set PageTimeout to {} for controller hci{}, reason: {}'.format(interface, timeout, e))
+#
+#    finally:
+#        # Close the socket
+#        if hci_socket != None:
+#            hci_socket.close()  
+
+
 ### Init & Start
 parser = argparse.ArgumentParser()
 parser.add_argument('--loglevel', help='LOG Level', default='warning')
@@ -585,6 +647,8 @@ _apikey = args.apikey
 
 btController = args.device[3:]
 logging.info('Using bluetooth controller {} (id={})'.format(args.device, btController))
+if setBluetoothPageTimeout(int(btController), PAGE_TIMEOUT) == -1:
+	sys.exit(1)
 
 absentInterval = int(args.interval)
 presentInterval = int(args.present_interval)
@@ -644,4 +708,3 @@ monitoringThread.start()
 # Demarrage des heartbeat vers jeedom
 heartbeatThread = HeartbeatThread(jc, monitoringThread, version)
 heartbeatThread.start()
-
