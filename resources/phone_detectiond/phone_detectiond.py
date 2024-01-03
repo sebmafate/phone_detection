@@ -74,7 +74,7 @@ class Phone:
         self.isReachableLastPolling = True
         if not self.isReachable:
             self.isReachable = True
-            logging.info('Set {}\'s phone present'.format(self.humanName))
+            logging.info('[{}] Set "{}" phone present [{}]'.format(self.deviceId, self.humanName, self.macAddress))
             self.mustUpdate = True
             return True
 
@@ -92,7 +92,7 @@ class Phone:
         if self.isReachable and datetime.utcnow() > thresholdDate:
             self.isReachable = False
             self.lastStateDate = datetime.utcnow()
-            logging.info('Set "{}" phone absent'.format(self.humanName))
+            logging.info('[{}] Set "{}" phone absent [{}]'.format(self.deviceId, self.humanName, self.macAddress))
             self.mustUpdate = True
             return True
 
@@ -133,7 +133,7 @@ class PhonesDetection:
     def start(self):
 
         for device in DEVICES.values():
-            logging.info('Starting monitoring for {} [{}]'.format(device.humanName, device.macAddress))
+            logging.info('[{}] Starting monitoring for {} [{}]'.format(device.deviceId, device.humanName, device.macAddress))
             deviceStatus = self.callback.getDeviceStatus(device.deviceId)
             logging.debug('Jeedom {} device status: {}'.format(device.deviceId, deviceStatus))
             if deviceStatus == True:
@@ -148,7 +148,7 @@ class PhonesDetection:
 
     def stop(self, waitForStop = True):
         for device in DEVICES.values():
-            logging.info('Stop monitoring for {} [{}]'.format(device.humanName, device.macAddress))
+            logging.info('[{}] Stop monitoring for {} [{}]'.format(device.deviceId, device.humanName, device.macAddress))
 
         self._stop = True
         if waitForStop:
