@@ -237,19 +237,16 @@ class PhonesDetection:
                 btctrl.processResponse = self.processResponse
                 btctrl.processTimeout = self.processTimeout
 
-                timetowait = 5.000  # pagetimeout is 2500 slots (1562.50 ms)
+                timetowait = 5.000  # 5 seconds, pagetimeout is 2500 slots (1562.50 ms)
                 retries = 2
                 request = partial(btctrl.request, self.macList)
                 await aio.sleep(0.1)
                 for i in range(retries):
-                    logging.debug('Sending bluetooth name request to {} devices (try {}/{})'.format(len(self.macList), i + 1, retries))
-                    request()
-                    # Time for the devices to reply
-                    await aio.sleep(timetowait)
-
-                #if len(self.macList) != 0:
-                #    cancel = partial(btctrl.cancel, self.macList)
-                #    cancel()
+                    if len(self.macList) != 0:
+                        logging.debug('Sending bluetooth name request to {} devices (try {}/{})'.format(len(self.macList), i + 1, retries))
+                        request()
+                        # Time for the devices to reply or to get timeout
+                        await aio.sleep(timetowait)
 
             except Exception as e:
                 logging.info('Exception: {}/{}'.format(type(e), e))
@@ -259,7 +256,8 @@ class PhonesDetection:
                 if conn is not None:
                     conn.close()
 
-            # Process the list of remaining mac address
+            # list of mac address that are in unknown state (no Timeout, no answer)
+            # force Polling at next round.
             await aio.sleep(1)
             for mac in self.macList:
                 logging.warning('No response for mac {}'.format(mac))
@@ -561,37 +559,6 @@ def setBluetoothPageTimeout(interface, timeout):
 
     logging.info('PageTimeout set to {}s for controller hci{}.'.format(timeout * 0.000625, interface))
     return 0
-
-#    # Convert the timeout to a little-endian byte representation
-#    timeout_bytes = timeout.to_bytes(2, byteorder='little')
-#    
-#    # HCI Command Packet structure:
-#    # - Type: 1 byte (0x01 for Command)
-#    # - Opcode: 2 bytes (OGF | OCF)
-#    # - Length: 1 byte (Length of command parameters)
-#    # - Parameters: Variable length
-#    hci_socket = None
-#    try:
-#        # Create an HCI socket
-#        hci_socket = socket.socket(socket.AF_BLUETOOTH, socket.SOCK_RAW, socket.BTPROTO_HCI)
-#
-#        # Bind the socket to any Bluetooth device (BDADDR_ANY) and any port (0)
-#        hci_socket.bind((interface,))
-#
-#        # Set the Page Timer to 20 seconds (assuming a 0.625 ms unit)
-#        command = b'\x01\x46\x04' + timeout_bytes
-#        hci_socket.send(command)
-#
-#        logging.info('PageTimeout set to {}s for controller hci{}.'.format(timeout * 0.000625, interface))
-#    
-#    except Exception as e:
-#        logging.error('Unable to set PageTimeout to {} for controller hci{}, reason: {}'.format(interface, timeout, e))
-#
-#    finally:
-#        # Close the socket
-#        if hci_socket != None:
-#            hci_socket.close()  
-
 
 ### Init & Start
 parser = argparse.ArgumentParser()

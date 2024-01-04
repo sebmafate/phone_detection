@@ -6,6 +6,11 @@ lang: fr_FR
 
 # Changelog
 
+## 2024-01-04 v2.2.2
+
+* Changement des parametres de polling par default (10/30) vers (15/60). Il est recommande de ne pas descendre sous les 15 secondes pour la frequence de polling des telephones absents.
+* Fix pour le probleme de droits avec l'antenne locale qui demarrait mais n'etait pas autoriser a envoyer des requetes bluetooth.
+
 ## 2024-01-02 v2.2.1
 
 Correction de bugs suite au passage en 2.2.0. Certains mobiles ne sont plus detectes, en fonction de differentes

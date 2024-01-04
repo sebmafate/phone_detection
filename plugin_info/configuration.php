@@ -110,7 +110,7 @@ nfinie et dans tous les cas la roue restera le temps de maj des antennes}}"></i>
         {{ Intervalle de mise à jour quand le téléphone est absent }} <sup><i class="fa fa-question-circle tooltips" title="{{C'est le temps en secondes entre 2 tentatives de ping du téléphone quand le téléphone est absent}}" style="font-size : 1em;color:grey;"></i></sup>
       </label>
       <div class="col-sm-1">
-        <input type="text" class="configKey form-control" data-l1key="interval" placeholder="10"/>
+        <input type="text" class="configKey form-control" data-l1key="interval" placeholder="15"/>
     </div>
     </fieldset>
     <fieldset>
@@ -119,7 +119,7 @@ nfinie et dans tous les cas la roue restera le temps de maj des antennes}}"></i>
         {{ Intervalle de mise à jour quand le téléphone est présent }} <sup><i class="fa fa-question-circle tooltips" title="{{C'est le temps en secondes entre 2 tentatives de ping du téléphone quand le téléphone est présent}}" style="font-size : 1em;color:grey;"></i></sup>
       </label>
       <div class="col-sm-1">
-        <input type="text" class="configKey form-control" data-l1key="present_interval" placeholder="30"/>
+        <input type="text" class="configKey form-control" data-l1key="present_interval" placeholder="60"/>
     </div>
     </fieldset>
     <fieldset>

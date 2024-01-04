@@ -7,7 +7,10 @@ class phone_detection extends eqLogic
 {
 
     /*************** Attributs ***************/
-
+    const DEFAULT_ABSENT_INTERVAL = 15;
+    const DEFAULT_PRESENT_INTERVAL = 60;
+    const DEFAULT_ABSENT_THRESHOLD = 180;
+    const DEFAULT_TCP_SERVER_PORT = 55009;
 
     /************* Static methods ************/
 
@@ -163,9 +166,9 @@ class phone_detection extends eqLogic
         $device = $remoteObject->getConfiguration('remoteDevice');
         $ip     = $remoteObject->getConfiguration('remoteIp');
         $script_path = '/home/'.$user.'/phone_detectiond/resources/phone_detectiond';
-        $interval = config::byKey('interval', 'phone_detection', 10);
-        $present_interval = config::byKey('present_interval', 'phone_detection', 30);
-        $absentThreshold = config::byKey('absentThreshold', 'phone_detection', 180);
+        $interval = config::byKey('interval', 'phone_detection', phone_detection::DEFAULT_ABSENT_INTERVAL);
+        $present_interval = config::byKey('present_interval', 'phone_detection', phone_detection::DEFAULT_PRESENT_INTERVAL);
+        $absentThreshold = config::byKey('absentThreshold', 'phone_detection', phone_detection::DEFAULT_ABSENT_THRESHOLD);
         $cmd = '/usr/bin/python3 ' . $script_path . '/phone_detectiond.py';
         $cmd .= ' --loglevel ' . log::convertLogLevel(log::getLogLevel('phone_detection'));
         $cmd .= ' --device ' . $device;
@@ -188,7 +191,7 @@ class phone_detection extends eqLogic
         $remoteObject = phone_detection_remote::byId($_remoteId);
         $value = array('apikey' => jeedom::getApiKey('phone_detection'), 'action' => 'stop', 'args' => '');
         phone_detection::callRemoteDaemon($value, $remoteObject);
-        $port   = config::byKey('socketport', 'phone_detection', 55009);
+        $port   = config::byKey('socketport', 'phone_detection', phone_detection::DEFAULT_TCP_SERVER_PORT);
         $remoteObject->execCmd(['fuser -k ' . $port . '/tcp >> /dev/null 2>&1 &']);
         return True;
     }
@@ -262,10 +265,10 @@ class phone_detection extends eqLogic
         $return['launchable'] = 'ok';
 
         $btport = config::byKey('btport', 'phone_detection');
-        $interval = config::byKey('interval', 'phone_detection', 10);
-        $present_interval = config::byKey('present_interval', 'phone_detection', 30);
-        $absentThreshold = config::byKey('absentThreshold', 'phone_detection', 180);
-        $port = config::byKey('socketport', 'phone_detection', 55009);
+        $interval = config::byKey('interval', 'phone_detection', phone_detection::DEFAULT_ABSENT_INTERVAL);
+        $present_interval = config::byKey('present_interval', 'phone_detection', phone_detection::DEFAULT_PRESENT_INTERVAL);
+        $absentThreshold = config::byKey('absentThreshold', 'phone_detection', phone_detection::DEFAULT_ABSENT_THRESHOLD);
+        $port = config::byKey('socketport', 'phone_detection', phone_detection::DEFAULT_TCP_SERVER_PORT);
 
         if (phone_detection::dependancy_info()['state'] == 'nok') {
             $cache = cache::byKey('dependancy' . 'phone_detection');
@@ -320,13 +323,13 @@ class phone_detection extends eqLogic
         }
         $btport = config::byKey('btport', 'phone_detection');
         $deamon_path = dirname(__FILE__) . '/../../resources';
-        $interval = config::byKey('interval', 'phone_detection', 10);
-        $present_interval = config::byKey('present_interval', 'phone_detection', 30);
-        $absentThreshold = config::byKey('absentThreshold', 'phone_detection', 180);
-        $tcpport = config::byKey('socketport', 'phone_detection', 55009);
+        $interval = config::byKey('interval', 'phone_detection', phone_detection::DEFAULT_ABSENT_INTERVAL);
+        $present_interval = config::byKey('present_interval', 'phone_detection', phone_detection::DEFAULT_PRESENT_INTERVAL);
+        $absentThreshold = config::byKey('absentThreshold', 'phone_detection', phone_detection::DEFAULT_ABSENT_THRESHOLD);
+        $tcpport = config::byKey('socketport', 'phone_detection', phone_detection::DEFAULT_TCP_SERVER_PORT);
         $callback = network::getNetworkAccess('internal', 'proto:127.0.0.1:port:comp') . '/plugins/phone_detection/core/php/phone_detection.php';
 
-        $cmd = '/usr/bin/python3 ' . $deamon_path . '/phone_detectiond/phone_detectiond.py ';
+        $cmd = 'sudo /usr/bin/python3 ' . $deamon_path . '/phone_detectiond/phone_detectiond.py ';
         $cmd .= ' --device ' . $btport;
         $cmd .= ' --loglevel ' . log::convertLogLevel(log::getLogLevel('phone_detection'));
         $cmd .= ' --apikey ' . jeedom::getApiKey('phone_detection');
@@ -494,7 +497,7 @@ class phone_detection extends eqLogic
 
     public static function callRemoteDaemon($query, $remote) {
         $ip = $remote->getConfiguration('remoteIp');
-        $sock = 'tcp://' . $ip . ':' . config::byKey('socketport', 'phone_detection', 55009);
+        $sock = 'tcp://' . $ip . ':' . config::byKey('socketport', 'phone_detection', phone_detection::DEFAULT_TCP_SERVER_PORT);
         $remote->setCache('lastupdate','0');
         phone_detection::callDaemon($query, $sock);
     }
@@ -536,11 +539,6 @@ class phone_detection extends eqLogic
         }
         log::add('phone_detection', 'debug', 'computePresence = ' . $globalState);
         $this->checkAndUpdateCmd($stateCmd, ($globalState > 0 ? 1 : 0));
-        //if ($globalState > 0) {
-        //    $this->checkAndUpdateCmd($stateCmd, 1);
-        //} else {
-        //    $this->checkAndUpdateCmd($stateCmd, 0);
-        //}
     }
 
     /// END REMOTE ANTENNAS
@@ -704,21 +702,6 @@ class phone_detection extends eqLogic
     }
 
     private static function createGlobalGroup() {
-        // $test = self::all();
-        // // log::add('phone_detection', 'debug', get_class($test));
-        // foreach($test as $t) {
-        //     log::add('phone_detection', 'debug', '-----------------');
-        //     // log::add('phone_detection', 'debug', /*$t.getName() . '\t' .*/ $t.getId()); // . '\t' . $t.getEqType_name());
-        //     log::add('phone_detection', 'debug', get_class($t) . '\t' . $t->getName() . ' [' . $t->getId() . '] ' . $t->getEqType_name());
-        // }
-
-        // $t = self::byLogicalId('GlobalGroup', 'phone_detection');
-        // log::add('phone_detection', 'debug', get_class($t) . '\t' . $t->getName() . ' [' . $t->getId() . '] ' . $t->getEqType_name());
-
-
-        // // log::add('phone_detection','debug', print_r($test));
-        // return;
-
         if (is_object(self::byLogicalId('GlobalGroup', 'phone_detection'))) {
             return;
         }
@@ -802,8 +785,6 @@ class phone_detection extends eqLogic
         } catch( Exception $ex) {
             log::add('phone_detection', 'debug', print_r($ex));
         }
-
-        // $group->save();
     }
 
     private function applyModuleConfiguration() {
@@ -827,7 +808,7 @@ class phone_detectionCmd extends cmd
         log::add('phone_detection', 'debug', 'cmdId:' . $this->getLogicalId());
 
         // Test pour ne répondre qu'à la commande rafraichir
-        if ($this->getLogicalId() == 'refresh' /*&& $this->getConfiguration('deviceType') == 'phone'*/) {
+        if ($this->getLogicalId() == 'refresh') {
             // On récupère l'équipement à partir de l'identifiant fournit par la commande
             $phone_detectionObj = phone_detection::byId($this->getEqlogic_id());
             log::add('phone_detection', 'debug', 'eqLogic Id:' . $this->getEqLogic_id());
@@ -854,16 +835,9 @@ class phone_detectionCmd extends cmd
 
                 $state = (empty($name) ? 0 : 1);
                 log::add('phone_detection', 'debug', 'device state: '. $state);
-
-                // On lui ajoute un évènement avec pour information 'Données de test'
-                //$dataCmd->event($state);
-                // On sauvegarde cet évènement
-                // $dataCmd->save();
             }
         }
         phone_detection::updateGlobalDevice();
     }
-
     /********** Getters and setters **********/
-
 }
