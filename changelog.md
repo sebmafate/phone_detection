@@ -6,6 +6,11 @@ lang: fr_FR
 
 # Changelog
 
+## 2024-02-26 v2.2.3
+
+Correction du probleme 'sending frame failed (-19)' qui apparaissait sur des distributions autres que raspberry, quel que soit la version du kernel linux.
+Une fois la version 2.2.3 installe, n'oubliez pas de mettre a jour vos antennes, et de redemarrer le deamon local si vous l'utilisez.
+
 ## 2024-01-04 v2.2.2
 
 * Changement des parametres de polling par default (10/30) vers (15/60). Il est recommande de ne pas descendre sous les 15 secondes pour la frequence de polling des telephones absents.

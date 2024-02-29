@@ -87,8 +87,6 @@ class BTNameRequester(asyncio.Protocol):
 
     def connection_made(self, transport):
         self.transport = transport
-        self.send_reset()
-
 
     def connection_lost(self, exc):
         super().connection_lost(exc)
@@ -98,12 +96,6 @@ class BTNameRequester(asyncio.Protocol):
         for addr in mac_addr:
             time.sleep(0.050)
             self.send_name_request(addr)
-
-    def cancel(self, mac_addr):
-        """Send Name request, mac_addr is a list of mac addresses"""
-        for addr in mac_addr:
-            time.sleep(0.050)
-            self.send_name_cancel(addr)
 
     def send_name_request(self,mac_addr):
         '''Sending ARP request for given IP'''
@@ -136,31 +128,6 @@ class BTNameRequester(asyncio.Protocol):
                 self.processResponse({"mac":mac,"name":name})
             elif resu[3]==b'\x04': #Page timeout
                 self.processTimeout({"mac": mac, "name": ''})
-
-
-    def send_name_cancel(self, mac_addr):
-
-        # make the frame :
-        frame = [
-            ### HCI header###
-            # Destination MAC address  :
-            pack('!B', HCI_COMMAND),
-            pack('!H', CMD_NAME_CANCEL),
-            #Length... we know it's 6
-            pack('!B',0x06),
-            #MAC address
-            int(mac_addr.replace(":",""),16).to_bytes(6,"little"),
-        ]
-
-        self.transport.write(b''.join(frame)) # Sending       
-
-
-    def send_reset(self):
-        # The OGF (Opcode Group Field) for the reset command is 0x03.
-        # The OCF (Opcode Command Field) for the reset command is 0x0003.
-        # The complete command opcode is thus 0x03 << 10 | 0x0003 = 0x0C03
-        reset_command = b'\x03\x0C\x00\x00'
-        self.transport.write(reset_command) # Sending
 
     def default_processResponse(self,data):
         pass
