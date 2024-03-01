@@ -129,6 +129,7 @@ class PhonesDetection:
         self.callback = callback
         self.macList = []
         self.nbConnectionFailure = 0
+        self.nbSendFailure = 0
 
     def start(self):
 
@@ -212,8 +213,9 @@ class PhonesDetection:
             self.nbConnectionFailure = 0
         except Exception as e:
             logging.error('Impossible de se connecter au bluetooth hci{}, exception: {}: {}'.format(self.btController, type(e), e))
-            self.nbConnectionFailure = self.nbConnectionFailure + 1
+            self.nbConnectionFailure += 1
             if self.nbConnectionFailure > 5:
+                logging.error('Suspecting an issue with the bluetooth, stop monitoring')
                 self.stop(False)
             return
 
@@ -264,7 +266,13 @@ class PhonesDetection:
                 for device in DEVICES.values():
                     if mac == device.macAddress:
                         device.isReachableLastPolling = False
-
+            if len(self.macList) == 0:
+                self.nbSendFailure = 0
+            else:
+                self.nbSendFailure += 1
+                if self.nbSendFailure > 5:
+                    logging.error('Suspecting an issue with the bluetooth, stop monitoring')
+                    self.stop(False)
 
     def __run(self):
         sleepTime = gcd(self.absentInterval, self.presentInterval)
@@ -553,12 +561,36 @@ def shutdown():
 
 def setBluetoothPageTimeout(interface, timeout):
 
-    if subprocess.call('sudo hciconfig {} pageto {}'.format(args.device, timeout), shell=True) != 0:
-        logging.error('Unable to set PageTimeout to {} for controller hci{}'.format(interface, timeout))
+    if subprocess.call('hciconfig {} pageto {}'.format(interface, timeout), shell=True) != 0:
+        logging.error('Unable to set PageTimeout to {}s for controller {}'.format(timeout * 0.000625, interface))
         return -1
 
-    logging.info('PageTimeout set to {}s for controller hci{}.'.format(timeout * 0.000625, interface))
+    logging.info('PageTimeout set to {}s for controller {}.'.format(timeout * 0.000625, interface))
     return 0
+
+def isHciInterfaceUp(interface):
+    try:
+        # Run hciconfig command to get information about the HCI interface
+        result = subprocess.run(['hciconfig', interface], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+        # Check if the command was successful (return code 0) and if the interface is UP
+        if result.returncode == 0 and 'UP RUNNING' in result.stdout:
+            return True
+        else:
+            return False
+    except Exception as e:
+        logging.error("Error checking HCI interface status for {}: {}".format(interface, e))
+        return False
+
+def setHciInterfaceUp(interface):
+    try:
+        # Run hciconfig command to bring the HCI interface up
+        subprocess.run(['hciconfig', interface, 'up'], check=True)
+        return True
+    except subprocess.CalledProcessError as e:
+        logging.error("Error bringing HCI interface {} up: {}".format(interface, e))
+        return False
+
 
 ### Init & Start
 parser = argparse.ArgumentParser()
@@ -614,7 +646,15 @@ _apikey = args.apikey
 
 btController = args.device[3:]
 logging.info('Using bluetooth controller {} (id={})'.format(args.device, btController))
-if setBluetoothPageTimeout(int(btController), PAGE_TIMEOUT) == -1:
+if isHciInterfaceUp(args.device) == True: 
+    logging.info('HCI interface {} is already UP'.format(args.device))
+elif setHciInterfaceUp(args.device) == True:
+    logging.info('HCI interface {} was down, and has been brought UP'.format(args.device))
+else:
+    logging.critical('Interface {} is down and status cannot be changed'.format(args.device))
+    sys.exit(1)
+    
+if setBluetoothPageTimeout(args.device, PAGE_TIMEOUT) == -1:
 	sys.exit(1)
 
 absentInterval = int(args.interval)

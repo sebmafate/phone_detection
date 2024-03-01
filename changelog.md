@@ -6,10 +6,19 @@ lang: fr_FR
 
 # Changelog
 
+## 2024-03-01 v2.2.4
+
+Amelioration autour de l'etat de l'interface HCI:
+
+1. Si l'interface HCI n'est pas UP au demarrage du demon, le demon va essayer de la passer UP. En cas d'echec le demon s'arrete. Si vous avez la gestion du demon active, le demon va etre redemarre a intervale regulier par jeedom.
+2. Si l'interface HCI passe DOWN alors que le demon tourne et monitor des telephones. Le demon va effectuer 5 sequences de monitoring avec la meme periodicite que d'habitude. Si le probleme persiste, le demon va arreter le monitoring, et informer Jeedom du probleme, qui va stopper completement le demon. Si vous avez la gestion du demon active, celui-ci va etre redemarrer automatiquement par Jeedom, et l'interface DOWN devrait etre fixe par le point (1).
+
+Une fois la version 2.2.4 installe, n'oubliez pas de mettre a jour vos antennes, et de redemarrer le deamon local si vous l'utilisez.
+
 ## 2024-02-26 v2.2.3
 
 Correction du probleme 'sending frame failed (-19)' qui apparaissait sur des distributions autres que raspberry, quel que soit la version du kernel linux.
-Une fois la version 2.2.3 installe, n'oubliez pas de mettre a jour vos antennes, et de redemarrer le deamon local si vous l'utilisez.
+Une fois la version 2.2.3 installee, n'oubliez pas de mettre a jour vos antennes, et de redemarrer le demon local si vous l'utilisez.
 
 ## 2024-01-04 v2.2.2
 
