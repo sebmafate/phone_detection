@@ -6,6 +6,11 @@ lang: fr_FR
 
 # Changelog
 
+## 2024-03-03 v2.2.5
+
+Correction autour du point (2) de la mise a jour precedente. Si l'interface passe down. on va arreter le monitoring si
+tous les mobiles ne retournent plus de reponses. Auparavant si on avait le message: "No response for mac XXX" 5 fois de suite, alors le monitoring s'arretait.
+
 ## 2024-03-01 v2.2.4
 
 Amelioration autour de l'etat de l'interface HCI:

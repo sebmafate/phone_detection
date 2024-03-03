@@ -266,13 +266,15 @@ class PhonesDetection:
                 for device in DEVICES.values():
                     if mac == device.macAddress:
                         device.isReachableLastPolling = False
-            if len(self.macList) == 0:
-                self.nbSendFailure = 0
-            else:
+
+            if len(self.macList) == len(DEVICES.keys()):
+                # there was no timeout and no response for all devices.
                 self.nbSendFailure += 1
                 if self.nbSendFailure > 5:
                     logging.error('Suspecting an issue with the bluetooth, stop monitoring')
                     self.stop(False)
+            else:
+                self.nbSendFailure = 0
 
     def __run(self):
         sleepTime = gcd(self.absentInterval, self.presentInterval)
