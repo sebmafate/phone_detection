@@ -89,7 +89,7 @@ switch ($action) {
                 if ($antenna->getRemoteName() == $source){
                     $antenna->setCache('version', $version);
                     if ($alive == 0) {
-                        log::add('phone_detection', 'error', 'Arret de l\'antenne ' . $antenna->getRemoteName() . ' because alive=' . $alive);
+                        log::add('phone_detection', 'error', 'Arret de l\'antenne ' . $antenna->getRemoteName() . ' car alive=0');
                         phone_detection::stopremote($antenna->getId());
                         message::add('phone_detection', 'Arret de l\'antenne ' . $antenna->getRemoteName() . ' suite a un probleme reporte par l\'antenne.');
                     } else {
@@ -97,6 +97,12 @@ switch ($action) {
                     }
                     break;
                 }
+            }
+        } else {
+            if ($alive == 0) {
+                log::add('phone_detection', 'error', 'Arret de l\'antenne local car alive=0');
+                phone_detection::deamon_stop();
+                message::add('phone_detection', 'Arret de l\'antenne local suite a un probleme reporte par l\'antenne.');
             }
         }
         $success = true;

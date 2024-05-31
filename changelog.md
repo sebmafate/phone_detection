@@ -6,6 +6,10 @@ lang: fr_FR
 
 # Changelog
 
+## 2024-03-03 v2.2.6
+
+En cas de probleme bluetooth, le monitoring des devices est arrete, et le probleme est reporte par l'antenne au plugin phone_detection. Celui-ci arrete le daemon sur l'antenne distante. Le comportement etait different pour le deamon local, qui reportait bien un probleme, mais qui n'etait pas arrete par le plugin. Ce probleme est maintenant fixe.
+
 ## 2024-03-03 v2.2.5
 
 Correction autour du point (2) de la mise a jour precedente. Si l'interface passe down. on va arreter le monitoring si
