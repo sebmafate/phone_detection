@@ -31,7 +31,7 @@ class phone_detection extends eqLogic
         );
 
         if (config::byKey('noLocal', 'phone_detection', 0) == 0){
-            $sock = 'unix://' . jeedom::getTmpFolder('phone_detection') . '/daemon.sock';
+            $sock = 'tcp://127.0.0.1:' . config::byKey('socketport', 'phone_detection', phone_detection::DEFAULT_TCP_SERVER_PORT);
 	        phone_detection::callDaemon($query, $sock);
         }
 
@@ -95,16 +95,15 @@ class phone_detection extends eqLogic
         }
 
         $globalDevice = self::byLogicalId('GlobalGroup', 'phone_detection');
-        $stateCmd = $globalDevice->getCmd('info', 'state');
-        $newState = ($deviceCount > 0 ? 1 : 0);
-        $globalDevice->checkAndUpdateCmd($stateCmd, $newState);
-        //$stateCmd->save();
+        if ($globalDevice != 0) {
+            $stateCmd = $globalDevice->getCmd('info', 'state');
+            $newState = ($deviceCount > 0 ? 1 : 0);
+            $globalDevice->checkAndUpdateCmd($stateCmd, $newState);
 
-        $deviceCountCmd = $globalDevice->getCmd('info', 'count');
-        $globalDevice->checkAndUpdateCmd($deviceCountCmd, $deviceCount);
-        //$deviceCountCmd->event($deviceCount);
-        //$deviceCountCmd->save();
-        log::add('phone_detection', 'debug', 'updateGlobalDevice: state=' . $newState . '/nb1=' . $deviceCount . '/nbDevices=' .(count($devices) - 1));
+            $deviceCountCmd = $globalDevice->getCmd('info', 'count');
+            $globalDevice->checkAndUpdateCmd($deviceCountCmd, $deviceCount);
+            log::add('phone_detection', 'debug', 'updateGlobalDevice: state=' . $newState . '/nb1=' . $deviceCount . '/nbDevices=' .(count($devices) - 1));
+        }
     }
 
     //
@@ -119,7 +118,7 @@ class phone_detection extends eqLogic
         exec('tar -zcvf /tmp/folder-phone_detection.tar.gz ' . $script_path);
         log::add('phone_detection','info','Envoie du fichier  /tmp/folder-phone_detection.tar.gz');
         $result = false;
-        $result = $remoteObject->execCmd(['rm -Rf /home/'.$user.'/phone_detectiond','mkdir -p /home/'.$user.'/phone_detectiond']);
+        $result = $remoteObject->execCmd(['sudo rm -Rf /home/'.$user.'/phone_detectiond','mkdir -p /home/'.$user.'/phone_detectiond']);
         if ($remoteObject->sendFiles('/tmp/folder-phone_detection.tar.gz','/home/'.$user.'/folder-phone_detection.tar.gz')) {
             log::add('phone_detection','info',__('Décompression du dossier distant',__FILE__));
             $result = $remoteObject->execCmd(['tar -zxf /home/'.$user.'/folder-phone_detection.tar.gz -C /home/'.$user.'/phone_detectiond','rm -f /home/'.$user.'/folder-phone_detection.tar.gz']);
@@ -169,7 +168,7 @@ class phone_detection extends eqLogic
         $interval = config::byKey('interval', 'phone_detection', phone_detection::DEFAULT_ABSENT_INTERVAL);
         $present_interval = config::byKey('present_interval', 'phone_detection', phone_detection::DEFAULT_PRESENT_INTERVAL);
         $absentThreshold = config::byKey('absentThreshold', 'phone_detection', phone_detection::DEFAULT_ABSENT_THRESHOLD);
-        $cmd = '/usr/bin/python3 ' . $script_path . '/phone_detectiond.py';
+        $cmd = 'sudo /usr/bin/python3 ' . $script_path . '/phone_detectiond.py';
         $cmd .= ' --loglevel ' . log::convertLogLevel(log::getLogLevel('phone_detection'));
         $cmd .= ' --device ' . $device;
         $cmd .= ' --socketport ' . config::byKey('socketport', 'phone_detection');
@@ -286,17 +285,17 @@ class phone_detection extends eqLogic
 
         if($interval == 0 || empty($interval)) {
             $return['launchable'] = 'nok';
-            $return['launchable_message'] = _('Veuillez reseigner un interval de mise à jour en absence supérieur à 0', __FILE__);
+            $return['launchable_message'] = _('Veuillez renseigner un interval de mise à jour en absence supérieur à 0', __FILE__);
         }
 
         if($present_interval == 0 || empty($present_interval)) {
             $return['launchable'] = 'nok';
-            $return['launchable_message'] = _('Veuillez reseigner un interval de mise à jour en présence supérieur à 0', __FILE__);
+            $return['launchable_message'] = _('Veuillez renseigner un interval de mise à jour en présence supérieur à 0', __FILE__);
         }
 
         if($absentThreshold == 0 || empty($absentThreshold)) {
             $return['launchable'] = 'nok';
-            $return['launchable_message'] = _('Veuillez reseigner un délai d\'absence supérieur à 0', __FILE__);
+            $return['launchable_message'] = _('Veuillez renseigner un délai d\'absence supérieur à 0', __FILE__);
         }
 
         if($port == 0 || empty($port)) {
@@ -334,7 +333,8 @@ class phone_detection extends eqLogic
         $cmd .= ' --loglevel ' . log::convertLogLevel(log::getLogLevel('phone_detection'));
         $cmd .= ' --apikey ' . jeedom::getApiKey('phone_detection');
         $cmd .= ' --pidfile ' . jeedom::getTmpFolder('phone_detection') . '/phone_detectiond.pid';
-        $cmd .= ' --socket ' . jeedom::getTmpFolder('phone_detection') . '/daemon.sock';
+        $cmd .= ' --socketport ' . config::byKey('socketport', 'phone_detection');
+        $cmd .= ' --sockethost "127.0.0.1"';
         $cmd .= ' --callback ' . $callback;
         $cmd .= ' --daemonname "local"';
         $cmd .= ' --interval ' . $interval;
@@ -712,25 +712,25 @@ class phone_detection extends eqLogic
             $group = new self();
             $group->setLogicalId('GlobalGroup');
 
-            log::add('phone_detection', 'debug', '\t--> set Name');
+            log::add('phone_detection', 'debug', '   --> set Name');
             $group->setName('Tous les téléphones');
 
-            log::add('phone_detection', 'debug', '\t--> set eqTypeName');
+            log::add('phone_detection', 'debug', '   --> set eqTypeName');
             $group->setEqType_name('phone_detection');
 
-            log::add('phone_detection', 'debug', '\t--> set deviceType');
+            log::add('phone_detection', 'debug', '   --> set deviceType');
             $group->setConfiguration('deviceType', 'GlobalGroup');
 
-            log::add('phone_detection', 'debug', '\t--> set visible = 0');
+            log::add('phone_detection', 'debug', '   --> set visible = 0');
             $group->setIsVisible(0);
 
-            log::add('phone_detection', 'debug', '\t--> set enable = 1');
+            log::add('phone_detection', 'debug', '   --> set enable = 1');
             $group->setIsEnable(1);
 
-            log::add('phone_detection', 'debug', '\t--> set category ');
+            log::add('phone_detection', 'debug', '   --> set category ');
             $group->setConfiguration('category', 'group');
 
-            log::add('phone_detection', 'debug', '\t--> set group id');
+            log::add('phone_detection', 'debug', '   --> set group id');
             $group->setConfiguration('id', 0);
 
             $group->save();

@@ -109,24 +109,16 @@ try {
         ajax::success();
      }
 
-     //if (init('action') == 'remotelearn') {
-     //   ajax::success(phone_detection::remotelearn(init('remoteId'), init('state')));
-     //}
-
      if (init('action') == 'dependancyRemote') {
         ajax::success(phone_detection::dependancyRemote(init('remoteId')));
      }
-
-    //if (init('action') == 'aliveremote') {
-    //    ajax::success(phone_detection::aliveremote(init('remoteId')));
-    //}
 
     if (init('action') == 'changeLogLive') {
         ajax::success(phone_detection::changeLogLive(init('level')));
     }
 
     throw new Exception('Aucune methode correspondante');
-    /*     * *********Catch exeption*************** */
+    /*     * *********Catch exception*************** */
 } catch (Exception $e) {
     //log::add('phone_detection', 'error', 'EXCEPTION ' . $e->getMessage . '(' . $e->getCode() . ')');
     ajax::error(displayException($e), $e->getCode());

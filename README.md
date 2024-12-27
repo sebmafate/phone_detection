@@ -1,14 +1,17 @@
 # Plugin phone_detection pour Jeedom
 
 ## 1. Description
+
 Ce plugin est développé pour fonctionner avec Jeedom.
 
 Il permet de détecter la présence d'un ou plusieurs téléphones en utilisant l'adresse MAC de la puce Bluetooth.
 
 ## 2. Installation
+
 Pour le moment, ce plugin n'est pas configuré dans le market Jeedom, j'attends qu'il soit stable avant de le publier. L'installation doit donc se faire manuellement.
 
 ### a. Installation via jeedom market
+
 Jeedom permet d'installer facilement un plugin :
 
 Pour cela dans le gestionnaire de plugins, cliquez sur le bouton "Market"
@@ -18,6 +21,7 @@ Dans la fenêtre qui s'ouvre, renseignez comme suit les informations :
 ![](images/add_plugin_github.jpg)
 
 ### b. Installation via le code source
+
 Il est aussi possible d'installer en utilisant le code source. Attention, cette manipulation est réservée à un public plutôt averti, vous pouvez en effet rendre votre Jeedom instable.
 
 - Dans une console (en ssh ou en local), rendez vous dans le répertoire /var/www/html/plugins
@@ -31,6 +35,7 @@ Il est aussi possible d'installer en utilisant le code source. Attention, cette 
 - Lancez le démon
 
 Allez dans l'écran "Plugins > Sécurité > Détection de téléphone (Bluetooth)" :
+
 - Ajoutez un téléphone en cliquant sur le bouton +
 - Puis donnez un nom à votre équipement et renseignez l'adresse MAC de la puce Bluetooth de votre téléphone
 - Enregistrez
@@ -40,6 +45,7 @@ Voici un exemple de configuration :
 ![Exemple de configuration](images/example_config.png)
 
 ## 4. Configuration d'antennes distantes
+
 La documentation est reprise du plugin BLEA, car l’implémentation du multi-antennes du plugin utilise le même principe que le plugin BLEA.
 
 Le Bluetooth ayant une portée relativement limitée, il est possible qu'une partie de votre habitation soit hors portée de votre antenne selon l'emplacement de votre box Jeedom.
@@ -83,4 +89,4 @@ La solution est présente sur le forum de Raspberry. Il faut mettre à jour un f
 => Le ficher à mettre à jour est le suivant :
 [pi-bluetooth/btuart at master · RPi-Distro/pi-bluetooth (github.com)](https://github.com/RPi-Distro/pi-bluetooth/blob/master/usr/bin/btuart)
 
-La source de mon information : [Bluetooth issue after updating to Kernel 5.4.51 on RPi4 - Raspberry Pi Forums](https://www.raspberrypi.org/forums/viewtopic.php?f=28&t=282948) 
+La source de mon information : [Bluetooth issue after updating to Kernel 5.4.51 on RPi4 - Raspberry Pi Forums](https://www.raspberrypi.org/forums/viewtopic.php?f=28&t=282948)

@@ -18,6 +18,13 @@
 
 /* * ***************************Includes********************************* */
 
+require_once __DIR__  . '/../../../../core/php/core.inc.php';
+require_once __DIR__ . '/../../vendor/autoload.php';
+
+
+use phpseclib3\Net\SSH2;
+use phpseclib3\Net\SFTP;
+
 class phone_detection_remote {
 	/*     * *************************Attributs****************************** */
 	private $id;
@@ -56,12 +63,12 @@ class phone_detection_remote {
 	}
 
 	public function getCache($_key = '', $_default = '') {
-		$cache = cache::byKey('PhoneDectionPluginRemote' . $this->getId())->getValue();
+		$cache = cache::byKey('PhoneDetectionPluginRemote' . $this->getId())->getValue();
 		return utils::getJsonAttr($cache, $_key, $_default);
 	}
 
 	public function setCache($_key, $_value = null) {
-		cache::set('PhoneDectionPluginRemote' . $this->getId(), utils::setJsonAttr(cache::byKey('PhoneDectionPluginRemote' . $this->getId())->getValue(), $_key, $_value));
+		cache::set('PhoneDetectionPluginRemote' . $this->getId(), utils::setJsonAttr(cache::byKey('PhoneDetectionPluginRemote' . $this->getId())->getValue(), $_key, $_value));
 	}
 
 	public static function getCacheRemotes($_key = '', $_default = '') {
@@ -73,84 +80,48 @@ class phone_detection_remote {
 		cache::set('PhoneDetectionPluginRemotes', utils::setJsonAttr(cache::byKey('PhoneDetectionPluginRemotes')->getValue(), $_key, $_value));
 	}
 
-	public function execCmd($_cmd) {
+	public function execCmd($_cmds) {
 		$ip = $this->getConfiguration('remoteIp');
-		$port = $this->getConfiguration('remotePort');
+		$port = $this->getConfiguration('remotePort', 22);
 		$user = $this->getConfiguration('remoteUser');
 		$pass = $this->getConfiguration('remotePassword');
-		if (!$connection = ssh2_connect($ip, $port)) {
-			log::add('phone_detection', 'error', 'connexion SSH KO for ' . $this->remoteName);
-				return false;
-		} else {
-			if (!ssh2_auth_password($connection, $user, $pass)) {
-				log::add('phone_detection', 'error', 'Authentification SSH KO for ' . $this->remoteName);
-				return false;
-			} else {
-				foreach ($_cmd as $cmd){
-					log::add('phone_detection', 'info', __('Commande par SSH ',__FILE__) . $cmd .  __(' sur ',__FILE__) . $ip);
-					$execmd = "echo '" . $pass . "' | sudo -S " . $cmd;
-					$stream = ssh2_exec($connection, $execmd);
-					$errorStream = ssh2_fetch_stream($stream, SSH2_STREAM_STDERR);
-					stream_set_blocking($errorStream, true);
-					stream_set_blocking($stream, true);
-					$output = stream_get_contents($stream) . ' ' . stream_get_contents($errorStream);
-					fclose($stream);
-					fclose($errorStream);
-					if (trim($output) != '') {
-						log::add('phone_detection','debug',$output);
-					}
-				}
-				$stream = ssh2_exec($connection, 'exit');
-				$errorStream = ssh2_fetch_stream($stream, SSH2_STREAM_STDERR);
-				stream_set_blocking($errorStream, true);
-				stream_set_blocking($stream, true);
-				$output = stream_get_contents($stream) . ' ' . stream_get_contents($errorStream);
-				fclose($stream);
-				fclose($errorStream);
-				if (trim($output) != '') {
-					log::add('phone_detection','debug',$output);
-				}
-				return $output !== false;
-			}
+	
+		$ssh = new SSH2($ip, $port, 30);
+		if (!$ssh->login($user, $pass)) {
+		  $error = "Authentication SSH KO for {$user}@{$ip}:{$port}; please check user and password.";
+		  log::add('phone_detection', 'error', $error, 'authentication failed');
+		  throw new Exception($error);
 		}
+	
+		$output = [];
+		foreach ($_cmds as $cmd) {
+		  	$cmd = str_replace("{user}", $user, $cmd);
+		  	log::add('phone_detection', 'info', __('Commande par SSH ',__FILE__) . $cmd .  __(' sur ',__FILE__) . $ip);
+		  	$output = $ssh->exec($cmd);
+		  	if (trim($output) != '') {
+				log::add('phone_detection','debug',$output);
+			}		 
+			$outputs[] = explode("\n", $output);
+		}
+		return $outputs;
 	}
 
 	public function sendFiles($_local, $_target) {
 		$ip = $this->getConfiguration('remoteIp');
-		$port = $this->getConfiguration('remotePort');
+		$port = $this->getConfiguration('remotePort', 22);
 		$user = $this->getConfiguration('remoteUser');
 		$pass = $this->getConfiguration('remotePassword');
-		if (!$connection = ssh2_connect($ip, $port)) {
-			log::add('phone_detection', 'error', 'connexion SSH KO for ' . $this->remoteName);
-			return false;
-		} else {
-			if (!ssh2_auth_password($connection, $user, $pass)) {
-				log::add('phone_detection', 'error', 'Authentification SSH KO for ' . $this->remoteName);
-				return false;
-			} else {
-				log::add('phone_detection', 'info', 'Envoie de fichier sur ' . $ip);
-				$result = ssh2_scp_send($connection, $_local, $_target, 0777);
-				if (!$result){
-					log::add('phone_detection','error','Files could not be sent to ' . $ip);
-					return false;
-				} else {
-					log::add('phone_detection','info','Files successfully sent to ' . $ip);
-				}
-				$execmd = "echo '" . $pass . "' | sudo -S " . 'exit';
-				$stream = ssh2_exec($connection, $execmd);
-				$errorStream = ssh2_fetch_stream($stream, SSH2_STREAM_STDERR);
-				stream_set_blocking($errorStream, true);
-				stream_set_blocking($stream, true);
-				$output = stream_get_contents($stream);
-				fclose($stream);
-				fclose($errorStream);
-				if (trim($output) != '') {
-					log::add('phone_detection','debug',$output);
-				}
-			}
+	
+		$sftp = new SFTP($ip, $port, 30);
+		if ($sftp->login($user, $pass)) {
+			log::add('phone_detection', 'debug', "send file {$_local} to {$ip}:{$_target}");
+			return $sftp->put($_target, $_local, SFTP::SOURCE_LOCAL_FILE);
 		}
-		return true;
-	}
+		log::add('phone_detection', 'debug', "login failed, could not send file {$_target}");
+		return false;
+	  }	
+
+
 
 	private function appendFileContents($sourceFile, $targetFile) {
 		try {
@@ -177,7 +148,7 @@ class phone_detection_remote {
 
 	public function getFiles($_local, $_target, $_append=false) {
 		$ip = $this->getConfiguration('remoteIp');
-		$port = $this->getConfiguration('remotePort');
+		$port = $this->getConfiguration('remotePort', 22);
 		$user = $this->getConfiguration('remoteUser');
 		$pass = $this->getConfiguration('remotePassword');
 		if ($_append == false) {
@@ -185,36 +156,25 @@ class phone_detection_remote {
 		} else {
 			$localFile = jeedom::getTmpFolder('phone_detection') . basename($_local);
 		}
-		if (!$connection = ssh2_connect($ip, $port)) {
-			log::add('phone_detection', 'error', 'connexion SSH KO for ' . $this->remoteName);
-				return false;
+
+		$sftp = new SFTP($ip, $port, 30);
+		if ($sftp->login($user, $pass)) {
+		  	log::add('phone_detection', 'debug', "get file '{$_target}' from {$ip}");
+		  	if (!file_exists($localFile)) {
+				touch($localFile);
+			}
+			return $sftp->get($_target, $localFile);
 		} else {
-			if (!ssh2_auth_password($connection, $user, $pass)) {
-				log::add('phone_detection', 'error', 'Authentification SSH KO for ' . $this->remoteName);
-				return false;
-			} else {
-				log::add('phone_detection', 'info', __('Récupération de fichier depuis ',__FILE__) . $ip);
-				$result = ssh2_scp_recv($connection, $_target, $localFile);
-				$execmd = "echo '" . $pass . "' | sudo -S " . 'exit';
-				$stream = ssh2_exec($connection, $execmd);
-				$errorStream = ssh2_fetch_stream($stream, SSH2_STREAM_STDERR);
-				stream_set_blocking($errorStream, true);
-				stream_set_blocking($stream, true);
-				$output = stream_get_contents($stream);
-				fclose($stream);
-				fclose($errorStream);
-				if (trim($output) != '') {
-					log::add('phone_detection','debug',$output);
-				}
-			}
-			// Append the file if needed
-			if ($_append == true) {
-				$this->appendFileContents($localFile, $_local);
-				unlink($localFile);
-			}
+			log::add('phone_detection', 'debug', "login failed, could not get file {$_target}");
+			return false;
+		}		
+		// Append the file if needed
+		if ($_append == true) {
+			$this->appendFileContents($localFile, $_local);
+			unlink($localFile);
 		}
 		return true;
-	}
+	}	
 
 	/*     * **********************Getteur Setteur*************************** */
 

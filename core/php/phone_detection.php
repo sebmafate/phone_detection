@@ -13,7 +13,8 @@ $action   = $results['action'];
 $value    = 0;
 $antennas = phone_detection_remote::getCacheRemotes('allremotes', array());
 if (config::byKey('noLocal', 'phone_detection', 0) == 0){
-    $local = array('id'=>0,'remoteName'=>'local','configuration'=>array());
+    $local = new phone_detection_remote();
+    utils::a2o($local, array( 'Id' => 0, 'RemoteName' => 'local'));
     array_push($antennas, $local);
 }
 
@@ -27,11 +28,8 @@ switch ($action) {
         log::add('phone_detection','info','Update device status (' . $value . ') from antenna ' . $source . ' for ' . $eqLogic->getHumanName());
         if ($eqLogic->getConfiguration('deviceType') == 'phone' && $eqLogic->getIsEnable()) {
             foreach ($antennas as $antenna){
-                if (method_exists($antenna, 'getRemoteName')) {
-                    $from = $antenna->getRemoteName();
-                } else {
-                    $from = 'local';
-                }
+                $from = $antenna->getRemoteName();
+                
                 if ($from == $source){
                     if (method_exists($antenna, 'setCache')) {
                         $antenna->setCache('lastupdate', date("Y-m-d H:i:s"));
@@ -103,7 +101,7 @@ switch ($action) {
                 log::add('phone_detection', 'error', 'Arret de l\'antenne local car alive=0');
                 phone_detection::deamon_stop();
                 message::add('phone_detection', 'Arret de l\'antenne local suite a un probleme reporte par l\'antenne.');
-            }
+            } 
         }
         $success = true;
         $value = 0;
@@ -118,11 +116,8 @@ switch ($action) {
 
         $values = Null;
         foreach ($antennas as $antenna){
-            if (method_exists($antenna, 'getRemoteName')) {
-                $from = $antenna->getRemoteName();
-            } else {
-                $from = 'local';
-            }
+            $from = $antenna->getRemoteName();
+
             if ($from == $source){
                 if (method_exists($antenna, 'setCache')) {
                    $antenna->setCache('lastupdate', date("Y-m-d H:i:s"));
@@ -171,15 +166,11 @@ switch ($action) {
             }
 
             foreach ($antennas as $antenna){
-                if (method_exists($antenna, 'getRemoteName')) {
                 $from = $antenna->getRemoteName();
-        } else {
-                $from = 'local';
-            }
                 if ($from == $source){
-                if (method_exists($antenna, 'setCache')) {
+                    if (method_exists($antenna, 'setCache')) {
                        $antenna->setCache('lastupdate', date("Y-m-d H:i:s"));
-                }
+                    }
                     $statePropertyCmd = $d->getCmd(null, 'state_' . $source);
                     if (!is_object($statePropertyCmd)) {
                         $statePropertyCmd = new phone_detectionCmd();

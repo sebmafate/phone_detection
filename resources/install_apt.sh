@@ -14,7 +14,7 @@ sudo apt-get install -y bluetooth rfkill
 echo 60 > ${PROGRESS_FILE}
 sudo apt-get install -y python3 bluez bluez-hcidump python3-pip --reinstall
 echo 80 > ${PROGRESS_FILE}
-sudo pip3 install requests
+sudo pip3 install requests  --break-system-packages
 echo 90 > ${PROGRESS_FILE}
 sudo rfkill unblock 0 >/dev/null 2>&1
 sudo rfkill unblock 1 >/dev/null 2>&1
@@ -27,4 +27,3 @@ sudo usermod -aG bluetooth www-data
 echo "********************************************************"
 echo "*			 Installation terminée					*"
 echo "********************************************************"
-rm ${PROGRESS_FILE}

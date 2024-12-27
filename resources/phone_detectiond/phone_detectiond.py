@@ -7,7 +7,7 @@ sebastien.ferrand@vbmaf.net
 
 2021/05/25: Benoit Rech 
 support multi-antennas. Each antenna sends the presence information
-to plugin phone_dectection that runs on jeedom. Jeedom consolidates the information from the 
+to plugin phone_detection that runs on jeedom. Jeedom consolidates the information from the 
 different antennas to build the "global" device status.
 
 2022/01/03: Benoit Rech
@@ -18,7 +18,7 @@ Install hcidump to be able to monitor hci frame directly on the antenna.
 Do not use system calls, or pyBluez because there are lots of issues on Debian 11 (bullseye).
 Rely on a class (aiobtname.py) developped by François Wautier, which uses direct HCI socket 
 with the system, and asynchonous calls that avoid using multi-threads. 
-A request is sent for each mobile, and the mobile's reponses are parsed on the fly.
+A request is sent for each mobile, and the mobile's responses are parsed on the fly.
 The polling interval is also more accurate, as well as the monitoring of the 'unreachable' threshold.
 '''
 
@@ -361,7 +361,6 @@ class JeedomCallback:
 
     def heartbeat(self, isMonitoringAlive, version):
         r = self.__send_now({'action':'heartbeat', 'version': version, 'alive': isMonitoringAlive})
-        #r = self.__send_now({'action':'heartbeat', 'version': version, 'alive': 1, 'monitor': isMonitoringAlive})
         if not r or not r.get('success'):
             logging.error('Error during heartbeat')
             return False
@@ -395,7 +394,7 @@ class JeedomCallback:
         devices = self.__send_now({'action':'get_devices'})
         if not devices or not devices.get('success'):
             logging.error('FAILED')
-            return None
+            return {}
         # values = json.loads(devices)
         r = {}
         for key in devices['value']:
