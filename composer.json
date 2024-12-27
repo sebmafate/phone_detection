@@ -1,5 +1,5 @@
 {
-    "name": "jeedom/phone_detection",
+    "name": "plugins/phone_detection",
     "config": {
         "optimize-autoloader": true,
         "preferred-install": "dist",
