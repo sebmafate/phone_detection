@@ -27,3 +27,4 @@ sudo usermod -aG bluetooth www-data
 echo "********************************************************"
 echo "*			 Installation terminée					*"
 echo "********************************************************"
+rm -f ${PROGRESS_FILE}
