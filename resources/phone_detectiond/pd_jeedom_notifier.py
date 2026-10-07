@@ -29,6 +29,7 @@ import logging
 import requests
 import time
 import json
+from datetime import datetime
 
 
 from pd_global import PLUGIN_NAME
@@ -70,9 +71,19 @@ class JeedomNotifier(BaseNotifier):
     def setDeviceStatus(self, device):
         logging.debug('jeedom-notifier[{}]: isReachable: {}'.format(device.deviceId, bool(device.isReachable)))
         if device.pluginVersion < 4:
-            msg = {'action': 'update_device_status', 'id' : device.deviceId, 'value': (0,1)[device.isReachable]}
+            msg = {
+                'action': 'update_device_status', 
+                'id' : device.deviceId, 
+                'value': (0,1)[device.isReachable]
+            }
         else:
-            msg = {'action': 'update_device_status', 'name' : device.humanName, 'isReachable': (0,1)[device.isReachable], 'macAddress': device.macAddress, 'lastStateDate': device.lastStateDate.isoformat()}
+            msg = {
+                'action': 'update_device_status', 
+                'name' : device.humanName, 
+                'isReachable': (0,1)[device.isReachable], 
+                'macAddress': device.macAddress, 
+                'lastStateDate': datetime.fromtimestamp(device.lastStateDate).isoformat()
+            }
 
         r = self.__send(msg)
         if not r or not r.get('success'):
